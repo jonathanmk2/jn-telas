@@ -11,106 +11,98 @@ import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-const hasSupabase = Boolean(
-process.env.NEXT_PUBLIC_SUPABASE_URL &&
-(
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-),
-)
+  const hasSupabase = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+  )
 
-let user: { email?: string | null } | null = null
+  let user: { email?: string | null } | null = null
 
-// Planos padrão: aparecem mesmo antes da configuração do Supabase.
-// Quando o banco estiver configurado, os dados ativos do Supabase substituem estes valores.
-let products: Product[] = [
-{
-id: 'plano-1-tela',
-name: '1 Tela LD CLOUD VIP',
-screens: 1,
-price_cents: 3500,
-description: 'Versão VIP • Acesso por 30 dias',
-},
-{
-id: 'plano-5-telas',
-name: '5 Telas LD CLOUD VIP',
-screens: 5,
-price_cents: 17000,
-description: 'Versão VIP • Acesso por 30 dias',
-},
-{
-id: 'plano-10-telas',
-name: '10 Telas LD CLOUD VIP',
-screens: 10,
-price_cents: 33000,
-description: 'Versão VIP • Acesso por 30 dias',
-},
-]
+  // Planos padrão
+  let products: Product[] = [
+    {
+      id: 'plano-1-tela',
+      name: '1 Tela LD CLOUD VIP',
+      screens: 1,
+      price_cents: 3500,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+    {
+      id: 'plano-5-telas',
+      name: '5 Telas LD CLOUD VIP',
+      screens: 5,
+      price_cents: 17000,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+    {
+      id: 'plano-10-telas',
+      name: '10 Telas LD CLOUD VIP',
+      screens: 10,
+      price_cents: 33000,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+  ]
 
-let isAdmin = false
+  let isAdmin = false
 
-// A Vercel não leva automaticamente o arquivo .env.local.
-// Só consulta o Supabase quando as variáveis estiverem configuradas.
-if (hasSupabase) {
-try {
-const supabase = await createClient()
+  if (hasSupabase) {
+    try {
+      const supabase = await createClient()
 
-```
-  const {
-    data: { user: sessionUser },
-  } = await supabase.auth.getUser()
+      const {
+        data: { user: sessionUser },
+      } = await supabase.auth.getUser()
 
-  user = sessionUser
+      user = sessionUser
 
-  const { data } = await supabase
-    .from('products')
-    .select('id, name, screens, price_cents, description')
-    .eq('active', true)
-    .order('screens', { ascending: true })
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, screens, price_cents, description')
+        .eq('active', true)
+        .order('screens', { ascending: true })
 
-  if (data && data.length > 0) {
-    products = data as Product[]
+      if (data && data.length > 0) {
+        products = data as Product[]
+      }
+
+      if (sessionUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', sessionUser.id)
+          .single()
+
+        isAdmin = profile?.is_admin ?? false
+      }
+    } catch (error) {
+      console.error('Supabase indisponível:', error)
+    }
   }
 
-  if (sessionUser) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', sessionUser.id)
-      .single()
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <SiteNavbar
+        user={user ? { email: user.email ?? null, isAdmin } : null}
+      />
 
-    isAdmin = profile?.is_admin ?? false
-  }
-} catch (error) {
-  console.error('Supabase indisponível:', error)
-}
-```
+      <main className="flex-1">
+        <Hero />
+        <Benefits />
 
-}
+        <Pricing
+          products={products}
+          isLoggedIn={!!user}
+        />
 
-return ( <div className="flex min-h-dvh flex-col">
-<SiteNavbar
-user={user ? { email: user.email ?? null, isAdmin } : null}
-/>
+        <Faq />
+        <Support />
+      </main>
 
-```
-  <main className="flex-1">
-    <Hero />
-    <Benefits />
-
-    <Pricing
-      products={products}
-      isLoggedIn={!!user}
-    />
-
-    <Faq />
-    <Support />
-  </main>
-
-  <Footer />
-  <WhatsAppButton />
-</div>
-```
-
-)
+      <Footer />
+      <WhatsAppButton />
+    </div>
+  )
 }
