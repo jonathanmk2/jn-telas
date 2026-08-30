@@ -30,18 +30,29 @@ export default function SignUpPage() {
       setError('A senha deve ter pelo menos 6 caracteres.')
       return
     }
+
     if (password !== confirm) {
       setError('As senhas não coincidem.')
       return
     }
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
-      setError('O sistema de contas ainda não está configurado. Configure o Supabase na Vercel.')
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !(
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+    ) {
+      setError(
+        'O sistema de contas ainda não está configurado. Configure o Supabase na Vercel.'
+      )
       return
     }
 
     setLoading(true)
+
     const supabase = createClient()
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -49,18 +60,24 @@ export default function SignUpPage() {
         emailRedirectTo:
           process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
           `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+        },
       },
     })
 
     if (error) {
+      console.error('Erro do Supabase ao criar conta:', error)
+
       if (error.message.toLowerCase().includes('already registered')) {
         setError('Este e-mail já está cadastrado. Tente entrar.')
       } else if (error.message.toLowerCase().includes('password')) {
         setError('Senha muito fraca. Use pelo menos 6 caracteres.')
       } else {
-        setError('Não foi possível criar a conta. Tente novamente.')
+        // Mostra o erro real retornado pelo Supabase
+        setError(error.message)
       }
+
       setLoading(false)
       return
     }
@@ -75,7 +92,10 @@ export default function SignUpPage() {
       footer={
         <>
           Já tem conta?{' '}
-          <Link href="/auth/login" className="font-medium text-primary hover:underline">
+          <Link
+            href="/auth/login"
+            className="font-medium text-primary hover:underline"
+          >
             Entrar
           </Link>
         </>
@@ -94,6 +114,7 @@ export default function SignUpPage() {
             onChange={(e) => setFullName(e.target.value)}
           />
         </div>
+
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">E-mail</Label>
           <Input
@@ -106,6 +127,7 @@ export default function SignUpPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">Senha</Label>
           <Input
@@ -118,6 +140,7 @@ export default function SignUpPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
+
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirm">Confirmar senha</Label>
           <Input
@@ -132,7 +155,10 @@ export default function SignUpPage() {
         </div>
 
         {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          <p
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
             {error}
           </p>
         )}
