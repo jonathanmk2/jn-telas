@@ -18,10 +18,23 @@ type BuyResult =
       needsAuth?: boolean
     }
 
-export async function createOrder(productId: string): Promise<BuyResult> {
+type BuyerData = {
+  firstName?: string
+  lastName?: string
+  identificationType?: string
+  identificationNumber?: string
+  phoneAreaCode?: string
+  phoneNumber?: string
+}
+
+export async function createOrder(
+  productId: string,
+  deviceId?: string,
+  buyerData?: BuyerData,
+): Promise<BuyResult> {
   try {
     // =====================================================
-    // 1. VERIFICA TOKEN DO MERCADO PAGO
+    // 1. TOKEN DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoToken =
@@ -37,7 +50,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 2. CLIENTE NORMAL: SOMENTE PARA VERIFICAR LOGIN
+    // 2. VERIFICA LOGIN
     // =====================================================
 
     const supabase = await createClient()
@@ -66,13 +79,12 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
     // =====================================================
     // 3. CLIENTE ADMIN
-    // IGNORA AS RESTRIÇÕES RLS NO SERVIDOR
     // =====================================================
 
     const admin = createAdminClient()
 
     // =====================================================
-    // 4. CONVERTE O ID DO BOTÃO PARA NÚMERO DE TELAS
+    // 4. CONVERTE O PLANO PARA NÚMERO DE TELAS
     // =====================================================
 
     const plans: Record<string, number> = {
@@ -96,12 +108,13 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
     console.log('INICIANDO COMPRA')
     console.log('Usuário:', user.id)
-    console.log('Plano recebido:', productId)
+    console.log('Plano:', productId)
     console.log('Quantidade de telas:', screens)
+    console.log('Device ID recebido:', !!deviceId)
     console.log('=================================')
 
     // =====================================================
-    // 5. BUSCA PRODUTO USANDO ADMIN CLIENT
+    // 5. BUSCA O PRODUTO
     // =====================================================
 
     const { data: product, error: productError } = await admin
@@ -128,7 +141,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 6. CRIA O PEDIDO NO BANCO
+    // 6. CRIA PEDIDO NO BANCO
     // =====================================================
 
     const { data: order, error: orderError } = await admin
@@ -156,21 +169,46 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('Pedido criado:', order.id)
 
     // =====================================================
-    // 7. CONVERTE O VALOR DE CENTAVOS PARA REAIS
+    // 7. VALORES
     // =====================================================
 
     const amount = (product.price_cents / 100).toFixed(2)
 
-    console.log('=================================')
-    console.log('CRIANDO PIX')
-    console.log('Produto:', product.name)
-    console.log('Telas:', product.screens)
-    console.log('Valor:', amount)
-    console.log('Pedido:', order.id)
-    console.log('=================================')
+    // =====================================================
+    // 8. MONTA OS DADOS DO COMPRADOR
+    // =====================================================
+
+    const payer: Record<string, unknown> = {
+      email: user.email ?? 'test_user_br@testuser.com',
+    }
+
+    if (buyerData?.firstName) {
+      payer.first_name = buyerData.firstName
+    }
+
+    if (buyerData?.lastName) {
+      payer.last_name = buyerData.lastName
+    }
+
+    if (
+      buyerData?.identificationType &&
+      buyerData?.identificationNumber
+    ) {
+      payer.identification = {
+        type: buyerData.identificationType,
+        number: buyerData.identificationNumber,
+      }
+    }
+
+    if (buyerData?.phoneAreaCode && buyerData?.phoneNumber) {
+      payer.phone = {
+        area_code: buyerData.phoneAreaCode,
+        number: buyerData.phoneNumber,
+      }
+    }
 
     // =====================================================
-    // 8. MONTA O PEDIDO PARA O MERCADO PAGO
+    // 9. MONTA A ORDER DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoBody = {
@@ -184,10 +222,28 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
       description: product.name,
 
-      payer: {
-        // E-mail usado para o ambiente de teste
-        email: 'test_user_br@testuser.com',
-      },
+      payer,
+
+      // ===============================================
+      // DADOS DO PRODUTO
+      // ===============================================
+
+      items: [
+        {
+          title: product.name,
+          description: `${product.screens} tela${
+            product.screens > 1 ? 's' : ''
+          } LD CLOUD - acesso por 30 dias`,
+          external_code: product.id,
+          quantity: 1,
+          unit_price: amount,
+          total_amount: amount,
+        },
+      ],
+
+      // ===============================================
+      // PAGAMENTO PIX
+      // ===============================================
 
       transactions: {
         payments: [
@@ -203,8 +259,35 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       },
     }
 
+    console.log('=================================')
+    console.log('CRIANDO PIX')
+    console.log('Produto:', product.name)
+    console.log('Telas:', product.screens)
+    console.log('Valor:', amount)
+    console.log('Pedido interno:', order.id)
+    console.log('Device ID:', deviceId ? 'SIM' : 'NÃO')
+    console.log('=================================')
+
     // =====================================================
-    // 9. ENVIA O PEDIDO PARA O MERCADO PAGO
+    // 10. HEADERS
+    // =====================================================
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${mercadoPagoToken}`,
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': randomUUID(),
+    }
+
+    // =====================================================
+    // DEVICE ID
+    // =====================================================
+
+    if (deviceId) {
+      headers['X-meli-session-id'] = deviceId
+    }
+
+    // =====================================================
+    // 11. ENVIA PARA O MERCADO PAGO
     // =====================================================
 
     const response = await fetch(
@@ -212,11 +295,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       {
         method: 'POST',
 
-        headers: {
-          Authorization: `Bearer ${mercadoPagoToken}`,
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': randomUUID(),
-        },
+        headers,
 
         body: JSON.stringify(mercadoPagoBody),
 
@@ -233,7 +312,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
 
     // =====================================================
-    // 10. SE O MERCADO PAGO DER ERRO
+    // 12. ERRO DO MERCADO PAGO
     // =====================================================
 
     if (!response.ok) {
@@ -257,7 +336,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 11. CONVERTE A RESPOSTA PARA JSON
+    // 13. CONVERTE RESPOSTA
     // =====================================================
 
     let mercadoPagoOrder: any
@@ -282,7 +361,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     )
 
     // =====================================================
-    // 12. PEGA O ID DO PEDIDO DO MERCADO PAGO
+    // 14. PEGA ID DA ORDER
     // =====================================================
 
     const mercadoPagoOrderId = String(
@@ -292,7 +371,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     )
 
     // =====================================================
-    // 13. SALVA O ID DO MERCADO PAGO
+    // 15. SALVA ID DO MERCADO PAGO
     // =====================================================
 
     if (mercadoPagoOrderId) {
@@ -312,7 +391,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 14. PROCURA OS DADOS DO PIX
+    // 16. PROCURA DADOS DO PIX
     // =====================================================
 
     const transaction =
@@ -347,7 +426,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
 
     // =====================================================
-    // 15. RETORNA OS DADOS PARA O SITE
+    // 17. RETORNA PARA O SITE
     // =====================================================
 
     return {
