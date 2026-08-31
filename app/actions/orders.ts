@@ -24,13 +24,17 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     // 1. VERIFICA TOKEN DO MERCADO PAGO
     // =====================================================
 
-    const mercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
+    // Primeiro usa o token de TESTE.
+    // Se não existir, usa o token de PRODUÇÃO.
+    const mercadoPagoToken =
+      process.env.MERCADO_PAGO_TEST_ACCESS_TOKEN ||
+      process.env.MERCADO_PAGO_ACCESS_TOKEN
 
     if (!mercadoPagoToken) {
       return {
         ok: false,
         error:
-          'O pagamento ainda não foi configurado. MERCADO_PAGO_ACCESS_TOKEN não encontrado.',
+          'O pagamento ainda não foi configurado. Nenhum Access Token do Mercado Pago foi encontrado.',
       }
     }
 
