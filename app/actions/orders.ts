@@ -21,32 +21,23 @@ type BuyResult =
 export async function createOrder(productId: string): Promise<BuyResult> {
   try {
     // =====================================================
-    // 1. DEFINE TOKEN DO MERCADO PAGO
+    // 1. VERIFICA TOKEN DO MERCADO PAGO
     // =====================================================
 
-    const testToken = process.env.MERCADO_PAGO_TEST_ACCESS_TOKEN
-    const productionToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
-
-    // Se existir token de teste, usa ele.
-    // Caso contrário, usa o token de produção.
-    const mercadoPagoToken = testToken || productionToken
-
-    const isSandbox = Boolean(testToken)
+    const mercadoPagoToken =
+      process.env.MERCADO_PAGO_TEST_ACCESS_TOKEN ||
+      process.env.MERCADO_PAGO_ACCESS_TOKEN
 
     if (!mercadoPagoToken) {
       return {
         ok: false,
         error:
-          'O pagamento ainda não foi configurado. Nenhum Access Token do Mercado Pago foi encontrado.',
+          'O pagamento ainda não foi configurado. Token do Mercado Pago não encontrado.',
       }
     }
 
-    console.log('=================================')
-    console.log('AMBIENTE MERCADO PAGO:', isSandbox ? 'TESTE' : 'PRODUÇÃO')
-    console.log('=================================')
-
     // =====================================================
-    // 2. CLIENTE NORMAL: VERIFICA LOGIN
+    // 2. CLIENTE NORMAL: SOMENTE PARA VERIFICAR LOGIN
     // =====================================================
 
     const supabase = await createClient()
@@ -75,12 +66,13 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
     // =====================================================
     // 3. CLIENTE ADMIN
+    // IGNORA AS RESTRIÇÕES RLS NO SERVIDOR
     // =====================================================
 
     const admin = createAdminClient()
 
     // =====================================================
-    // 4. CONVERTE O ID PARA QUANTIDADE DE TELAS
+    // 4. CONVERTE O ID DO BOTÃO PARA NÚMERO DE TELAS
     // =====================================================
 
     const plans: Record<string, number> = {
@@ -109,7 +101,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
 
     // =====================================================
-    // 5. BUSCA O PRODUTO
+    // 5. BUSCA PRODUTO USANDO ADMIN CLIENT
     // =====================================================
 
     const { data: product, error: productError } = await admin
@@ -164,7 +156,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('Pedido criado:', order.id)
 
     // =====================================================
-    // 7. CONVERTE CENTAVOS PARA REAIS
+    // 7. CONVERTE O VALOR DE CENTAVOS PARA REAIS
     // =====================================================
 
     const amount = (product.price_cents / 100).toFixed(2)
@@ -175,24 +167,10 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('Telas:', product.screens)
     console.log('Valor:', amount)
     console.log('Pedido:', order.id)
-    console.log('Ambiente:', isSandbox ? 'TESTE' : 'PRODUÇÃO')
     console.log('=================================')
 
     // =====================================================
-    // 8. DEFINE O PAGADOR
-    // =====================================================
-
-    const payer = isSandbox
-      ? {
-          email: 'test_user_br@testuser.com',
-          first_name: 'APRO',
-        }
-      : {
-          email: user.email || 'cliente@jntelas.com',
-        }
-
-    // =====================================================
-    // 9. MONTA O PEDIDO PARA O MERCADO PAGO
+    // 8. MONTA O PEDIDO PARA O MERCADO PAGO
     // =====================================================
 
     const mercadoPagoBody = {
@@ -206,7 +184,11 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
       description: product.name,
 
-      payer,
+      payer: {
+        // No ambiente de teste o Mercado Pago exige
+        // um e-mail de conta de teste
+        email: 'test_user@testuser.com',
+      },
 
       transactions: {
         payments: [
@@ -223,7 +205,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 10. ENVIA PARA O MERCADO PAGO
+    // 9. ENVIA O PEDIDO PARA O MERCADO PAGO
     // =====================================================
 
     const response = await fetch(
@@ -252,7 +234,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
 
     // =====================================================
-    // 11. TRATA ERRO DO MERCADO PAGO
+    // 10. SE O MERCADO PAGO DER ERRO
     // =====================================================
 
     if (!response.ok) {
@@ -276,7 +258,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 12. CONVERTE RESPOSTA PARA JSON
+    // 11. CONVERTE A RESPOSTA PARA JSON
     // =====================================================
 
     let mercadoPagoOrder: any
@@ -301,7 +283,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     )
 
     // =====================================================
-    // 13. PEGA ID DO PEDIDO DO MERCADO PAGO
+    // 12. PEGA O ID DO PEDIDO DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoOrderId = String(
@@ -311,7 +293,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     )
 
     // =====================================================
-    // 14. SALVA O ID DO MERCADO PAGO
+    // 13. SALVA O ID DO MERCADO PAGO
     // =====================================================
 
     if (mercadoPagoOrderId) {
@@ -331,7 +313,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // 15. PROCURA OS DADOS DO PIX
+    // 14. PROCURA OS DADOS DO PIX
     // =====================================================
 
     const transaction =
@@ -341,16 +323,17 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       null
 
     const qrCode =
-      transaction?.point_of_interaction?.transaction_data?.qr_code ??
+      transaction?.payment_method?.qr_code ??
       transaction?.qr_code ??
+      transaction?.point_of_interaction?.transaction_data?.qr_code ??
       mercadoPagoOrder.qr_code ??
       mercadoPagoOrder.point_of_interaction?.transaction_data?.qr_code ??
       null
 
     const qrCodeBase64 =
-      transaction?.point_of_interaction?.transaction_data
-        ?.qr_code_base64 ??
+      transaction?.payment_method?.qr_code_base64 ??
       transaction?.qr_code_base64 ??
+      transaction?.point_of_interaction?.transaction_data?.qr_code_base64 ??
       mercadoPagoOrder.qr_code_base64 ??
       mercadoPagoOrder.point_of_interaction?.transaction_data
         ?.qr_code_base64 ??
@@ -365,7 +348,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     console.log('=================================')
 
     // =====================================================
-    // 16. RETORNA OS DADOS PARA O SITE
+    // 15. RETORNA OS DADOS PARA O SITE
     // =====================================================
 
     return {
