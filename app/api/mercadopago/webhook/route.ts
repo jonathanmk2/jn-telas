@@ -12,24 +12,58 @@ export async function POST(request: NextRequest) {
 
     if (!mercadoPagoToken) {
       console.error(
-        'Token de produção do Mercado Pago não configurado.',
+        'Token do Mercado Pago não configurado.',
       )
 
       return NextResponse.json(
-        { error: 'Mercado Pago não configurado' },
+        {
+          error:
+            'Mercado Pago não configurado',
+        },
         { status: 500 },
       )
     }
 
     const url = new URL(request.url)
 
-    const type =
+    // =====================================================
+    // PEGA DADOS DA URL
+    // =====================================================
+
+    let type =
       url.searchParams.get('type') ||
       url.searchParams.get('topic')
 
-    const notificationId =
+    let notificationId =
       url.searchParams.get('data.id') ||
       url.searchParams.get('id')
+
+    // =====================================================
+    // TENTA PEGAR O BODY TAMBÉM
+    // =====================================================
+
+    try {
+      const body = await request.json()
+
+      console.log(
+        'Body recebido:',
+        JSON.stringify(body),
+      )
+
+      if (!type && body.type) {
+        type = body.type
+      }
+
+      if (!notificationId && body.data?.id) {
+        notificationId = String(
+          body.data.id,
+        )
+      }
+    } catch {
+      console.log(
+        'Webhook sem JSON no body.',
+      )
+    }
 
     console.log('Tipo recebido:', type)
     console.log('ID recebido:', notificationId)
@@ -43,7 +77,9 @@ export async function POST(request: NextRequest) {
         'Notificação sem ID. Ignorada.',
       )
 
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({
+        ok: true,
+      })
     }
 
     const admin = createAdminClient()
@@ -54,18 +90,20 @@ export async function POST(request: NextRequest) {
 
     if (type === 'payment') {
       console.log(
-        'Processando notificação de PAYMENT.',
+        'Processando notificação PAYMENT.',
       )
 
-      const paymentResponse = await fetch(
-        `https://api.mercadopago.com/v1/payments/${notificationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${mercadoPagoToken}`,
+      const paymentResponse =
+        await fetch(
+          `https://api.mercadopago.com/v1/payments/${notificationId}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${mercadoPagoToken}`,
+            },
+            cache: 'no-store',
           },
-          cache: 'no-store',
-        },
-      )
+        )
 
       if (!paymentResponse.ok) {
         const errorText =
@@ -77,14 +115,24 @@ export async function POST(request: NextRequest) {
           errorText,
         )
 
-        return NextResponse.json({ ok: true })
+        return NextResponse.json({
+          ok: true,
+        })
       }
 
       const payment =
         await paymentResponse.json()
 
-      console.log('Payment ID:', payment.id)
-      console.log('Status:', payment.status)
+      console.log(
+        'Payment ID:',
+        payment.id,
+      )
+
+      console.log(
+        'Payment Status:',
+        payment.status,
+      )
+
       console.log(
         'External Reference:',
         payment.external_reference,
@@ -98,17 +146,22 @@ export async function POST(request: NextRequest) {
           'Pagamento sem external_reference.',
         )
 
-        return NextResponse.json({ ok: true })
+        return NextResponse.json({
+          ok: true,
+        })
       }
 
       await processPayment({
         admin,
         orderId,
         paymentId: String(payment.id),
-        paymentStatus: payment.status,
+        paymentStatus:
+          payment.status ?? '',
       })
 
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({
+        ok: true,
+      })
     }
 
     // =====================================================
@@ -117,18 +170,20 @@ export async function POST(request: NextRequest) {
 
     if (type === 'order') {
       console.log(
-        'Processando notificação de ORDER.',
+        'Processando notificação ORDER.',
       )
 
-      const orderResponse = await fetch(
-        `https://api.mercadopago.com/v1/orders/${notificationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${mercadoPagoToken}`,
+      const orderResponse =
+        await fetch(
+          `https://api.mercadopago.com/v1/orders/${notificationId}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${mercadoPagoToken}`,
+            },
+            cache: 'no-store',
           },
-          cache: 'no-store',
-        },
-      )
+        )
 
       if (!orderResponse.ok) {
         const errorText =
@@ -140,7 +195,9 @@ export async function POST(request: NextRequest) {
           errorText,
         )
 
-        return NextResponse.json({ ok: true })
+        return NextResponse.json({
+          ok: true,
+        })
       }
 
       const mercadoPagoOrder =
@@ -169,8 +226,14 @@ export async function POST(request: NextRequest) {
           'Order sem external_reference.',
         )
 
-        return NextResponse.json({ ok: true })
+        return NextResponse.json({
+          ok: true,
+        })
       }
+
+      // ===================================================
+      // PROCURA O PAGAMENTO
+      // ===================================================
 
       const transaction =
         mercadoPagoOrder.transactions
@@ -183,12 +246,12 @@ export async function POST(request: NextRequest) {
       const paymentId =
         transaction?.id
           ? String(transaction.id)
-          : null
+          : String(mercadoPagoOrder.id)
 
       const paymentStatus =
         transaction?.status ??
         mercadoPagoOrder.status ??
-        null
+        ''
 
       console.log(
         'Payment ID:',
@@ -200,14 +263,6 @@ export async function POST(request: NextRequest) {
         paymentStatus,
       )
 
-      if (!paymentId || !paymentStatus) {
-        console.log(
-          'Ainda não existe pagamento finalizado.',
-        )
-
-        return NextResponse.json({ ok: true })
-      }
-
       await processPayment({
         admin,
         orderId,
@@ -215,7 +270,9 @@ export async function POST(request: NextRequest) {
         paymentStatus,
       })
 
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({
+        ok: true,
+      })
     }
 
     // =====================================================
@@ -227,19 +284,27 @@ export async function POST(request: NextRequest) {
       type,
     )
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({
+      ok: true,
+    })
   } catch (error) {
     console.error('=================================')
-    console.error('ERRO NO WEBHOOK MERCADO PAGO')
+    console.error(
+      'ERRO NO WEBHOOK MERCADO PAGO',
+    )
     console.error(error)
     console.error('=================================')
 
-    return NextResponse.json({ ok: true })
+    // Sempre responde 200 para evitar
+    // reenvios infinitos do webhook
+    return NextResponse.json({
+      ok: true,
+    })
   }
 }
 
 // =========================================================
-// PROCESSA O PAGAMENTO E ENTREGA O CÓDIGO
+// PROCESSA PAGAMENTO
 // =========================================================
 
 async function processPayment({
@@ -257,17 +322,35 @@ async function processPayment({
   console.log('PROCESSANDO STATUS DO PAGAMENTO')
   console.log('Pedido interno:', orderId)
   console.log('Payment ID:', paymentId)
-  console.log('Status:', paymentStatus)
+  console.log('Status recebido:', paymentStatus)
   console.log('=================================')
 
-  const { data: order, error: orderError } =
-    await admin
-      .from('orders')
-      .select(
-        'id, user_id, product_id, status, activation_code_id',
-      )
-      .eq('id', orderId)
-      .single()
+  // =====================================================
+  // NORMALIZA STATUS
+  // =====================================================
+
+  const normalizedStatus =
+    paymentStatus.toLowerCase()
+
+  console.log(
+    'Status normalizado:',
+    normalizedStatus,
+  )
+
+  // =====================================================
+  // BUSCA PEDIDO
+  // =====================================================
+
+  const {
+    data: order,
+    error: orderError,
+  } = await admin
+    .from('orders')
+    .select(
+      'id, user_id, product_id, status, activation_code_id',
+    )
+    .eq('id', orderId)
+    .single()
 
   if (orderError || !order) {
     console.error(
@@ -283,14 +366,36 @@ async function processPayment({
     order.id,
   )
 
+  console.log(
+    'Status atual do pedido:',
+    order.status,
+  )
+
+  // =====================================================
+  // STATUS CONSIDERADOS PAGOS
+  // =====================================================
+
+  const paidStatuses = [
+    'approved',
+    'processed',
+    'accredited',
+  ]
+
+  const isPaid =
+    paidStatuses.includes(
+      normalizedStatus,
+    )
+
   // =====================================================
   // PAGAMENTO APROVADO
   // =====================================================
 
-  if (paymentStatus === 'approved') {
-    console.log('PAGAMENTO APROVADO!')
+  if (isPaid) {
+    console.log('=================================')
+    console.log('PAGAMENTO CONFIRMADO!')
+    console.log('=================================')
 
-    // Evita entregar duas vezes caso o webhook seja reenviado
+    // Evita entregar duas vezes
     if (order.status === 'delivered') {
       console.log(
         'Pedido já foi entregue anteriormente.',
@@ -299,13 +404,18 @@ async function processPayment({
       return
     }
 
+    // ===================================================
+    // MARCA COMO PAGO
+    // ===================================================
+
     const { error: paidError } =
       await admin
         .from('orders')
         .update({
           status: 'paid',
           payment_id: paymentId,
-          paid_at: new Date().toISOString(),
+          paid_at:
+            new Date().toISOString(),
         })
         .eq('id', order.id)
 
@@ -318,22 +428,32 @@ async function processPayment({
       return
     }
 
-    console.log('Pedido marcado como PAID.')
+    console.log(
+      'Pedido marcado como PAID.',
+    )
 
-    // =====================================================
+    // ===================================================
     // PROCURA CÓDIGO DISPONÍVEL
-    // =====================================================
+    // ===================================================
 
     const {
       data: code,
       error: codeError,
     } = await admin
       .from('activation_codes')
-      .select('id')
-      .eq('product_id', order.product_id)
+      .select('id, code')
+      .eq(
+        'product_id',
+        order.product_id,
+      )
       .eq('status', 'active')
       .is('user_id', null)
-      .order('created_at')
+      .order(
+        'created_at',
+        {
+          ascending: true,
+        },
+      )
       .limit(1)
       .maybeSingle()
 
@@ -347,9 +467,15 @@ async function processPayment({
     }
 
     if (!code) {
-      console.log(
-        'Nenhum código disponível para este produto.',
+      console.error('=================================')
+      console.error(
+        'NENHUM CÓDIGO DISPONÍVEL!',
       )
+      console.error(
+        'Produto:',
+        order.product_id,
+      )
+      console.error('=================================')
 
       return
     }
@@ -359,16 +485,17 @@ async function processPayment({
       code.id,
     )
 
-    // =====================================================
-    // ATRIBUI O CÓDIGO AO USUÁRIO
-    // =====================================================
+    // ===================================================
+    // ATRIBUI CÓDIGO AO USUÁRIO
+    // ===================================================
 
     const { error: assignError } =
       await admin
         .from('activation_codes')
         .update({
           user_id: order.user_id,
-          assigned_at: new Date().toISOString(),
+          assigned_at:
+            new Date().toISOString(),
         })
         .eq('id', code.id)
         .is('user_id', null)
@@ -382,18 +509,23 @@ async function processPayment({
       return
     }
 
-    // =====================================================
-    // MARCA PEDIDO COMO ENTREGUE
-    // =====================================================
+    console.log(
+      'Código atribuído ao usuário.',
+    )
 
-    const { error: deliverError } =
-      await admin
-        .from('orders')
-        .update({
-          status: 'delivered',
-          activation_code_id: code.id,
-        })
-        .eq('id', order.id)
+    // ===================================================
+    // MARCA PEDIDO COMO ENTREGUE
+    // ===================================================
+
+    const {
+      error: deliverError,
+    } = await admin
+      .from('orders')
+      .update({
+        status: 'delivered',
+        activation_code_id: code.id,
+      })
+      .eq('id', order.id)
 
     if (deliverError) {
       console.error(
@@ -408,6 +540,8 @@ async function processPayment({
     console.log(
       'CÓDIGO ENTREGUE AO USUÁRIO COM SUCESSO!',
     )
+    console.log('Pedido:', order.id)
+    console.log('Código ID:', code.id)
     console.log('=================================')
 
     return
@@ -417,28 +551,47 @@ async function processPayment({
   // PAGAMENTO CANCELADO / REJEITADO
   // =====================================================
 
+  const cancelledStatuses = [
+    'rejected',
+    'cancelled',
+    'failed',
+  ]
+
   if (
-    paymentStatus === 'rejected' ||
-    paymentStatus === 'cancelled'
+    cancelledStatuses.includes(
+      normalizedStatus,
+    )
   ) {
     console.log(
       'Pagamento cancelado/rejeitado:',
-      paymentStatus,
+      normalizedStatus,
     )
 
-    await admin
-      .from('orders')
-      .update({
-        status: 'cancelled',
-        payment_id: paymentId,
-      })
-      .eq('id', order.id)
+    const { error } =
+      await admin
+        .from('orders')
+        .update({
+          status: 'cancelled',
+          payment_id: paymentId,
+        })
+        .eq('id', order.id)
+
+    if (error) {
+      console.error(
+        'Erro ao cancelar pedido:',
+        error,
+      )
+    }
 
     return
   }
 
+  // =====================================================
+  // AINDA AGUARDANDO PAGAMENTO
+  // =====================================================
+
   console.log(
-    'Pagamento ainda não foi aprovado:',
-    paymentStatus,
+    'Pagamento ainda aguardando confirmação:',
+    normalizedStatus,
   )
 }
