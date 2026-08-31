@@ -18,19 +18,8 @@ type BuyResult =
       needsAuth?: boolean
     }
 
-type BuyerData = {
-  firstName?: string
-  lastName?: string
-  identificationType?: string
-  identificationNumber?: string
-  phoneAreaCode?: string
-  phoneNumber?: string
-}
-
 export async function createOrder(
   productId: string,
-  deviceId?: string,
-  buyerData?: BuyerData,
 ): Promise<BuyResult> {
   try {
     // =====================================================
@@ -49,8 +38,14 @@ export async function createOrder(
       }
     }
 
+    // Opcional:
+    // Só será enviado se você cadastrar um X-Integrator-Id
+    // OFICIAL fornecido pelo Mercado Pago.
+    const mercadoPagoIntegratorId =
+      process.env.MERCADO_PAGO_INTEGRATOR_ID
+
     // =====================================================
-    // 2. VERIFICA LOGIN
+    // 2. VERIFICA LOGIN DO USUÁRIO
     // =====================================================
 
     const supabase = await createClient()
@@ -108,9 +103,8 @@ export async function createOrder(
     console.log('=================================')
     console.log('INICIANDO COMPRA')
     console.log('Usuário:', user.id)
-    console.log('Plano:', productId)
+    console.log('Plano recebido:', productId)
     console.log('Quantidade de telas:', screens)
-    console.log('Device ID recebido:', !!deviceId)
     console.log('=================================')
 
     // =====================================================
@@ -141,7 +135,7 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 6. CRIA PEDIDO NO BANCO
+    // 6. CRIA O PEDIDO NO BANCO
     // =====================================================
 
     const { data: order, error: orderError } = await admin
@@ -169,46 +163,24 @@ export async function createOrder(
     console.log('Pedido criado:', order.id)
 
     // =====================================================
-    // 7. VALORES
+    // 7. CONVERTE CENTAVOS PARA REAIS
     // =====================================================
 
-    const amount = (product.price_cents / 100).toFixed(2)
+    const amount = (
+      product.price_cents / 100
+    ).toFixed(2)
+
+    console.log('=================================')
+    console.log('CRIANDO PIX')
+    console.log('Produto:', product.name)
+    console.log('Telas:', product.screens)
+    console.log('Valor:', amount)
+    console.log('Pedido:', order.id)
+    console.log('Application ID:', '341541894748111')
+    console.log('=================================')
 
     // =====================================================
-    // 8. MONTA OS DADOS DO COMPRADOR
-    // =====================================================
-
-    const payer: Record<string, unknown> = {
-      email: user.email ?? 'test_user_br@testuser.com',
-    }
-
-    if (buyerData?.firstName) {
-      payer.first_name = buyerData.firstName
-    }
-
-    if (buyerData?.lastName) {
-      payer.last_name = buyerData.lastName
-    }
-
-    if (
-      buyerData?.identificationType &&
-      buyerData?.identificationNumber
-    ) {
-      payer.identification = {
-        type: buyerData.identificationType,
-        number: buyerData.identificationNumber,
-      }
-    }
-
-    if (buyerData?.phoneAreaCode && buyerData?.phoneNumber) {
-      payer.phone = {
-        area_code: buyerData.phoneAreaCode,
-        number: buyerData.phoneNumber,
-      }
-    }
-
-    // =====================================================
-    // 9. MONTA A ORDER DO MERCADO PAGO
+    // 8. MONTA O PEDIDO DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoBody = {
@@ -222,28 +194,9 @@ export async function createOrder(
 
       description: product.name,
 
-      payer,
-
-      // ===============================================
-      // DADOS DO PRODUTO
-      // ===============================================
-
-      items: [
-        {
-          title: product.name,
-          description: `${product.screens} tela${
-            product.screens > 1 ? 's' : ''
-          } LD CLOUD - acesso por 30 dias`,
-          external_code: product.id,
-          quantity: 1,
-          unit_price: amount,
-          total_amount: amount,
-        },
-      ],
-
-      // ===============================================
-      // PAGAMENTO PIX
-      // ===============================================
+      payer: {
+        email: 'test_user_br@testuser.com',
+      },
 
       transactions: {
         payments: [
@@ -259,17 +212,8 @@ export async function createOrder(
       },
     }
 
-    console.log('=================================')
-    console.log('CRIANDO PIX')
-    console.log('Produto:', product.name)
-    console.log('Telas:', product.screens)
-    console.log('Valor:', amount)
-    console.log('Pedido interno:', order.id)
-    console.log('Device ID:', deviceId ? 'SIM' : 'NÃO')
-    console.log('=================================')
-
     // =====================================================
-    // 10. HEADERS
+    // 9. HEADERS
     // =====================================================
 
     const headers: Record<string, string> = {
@@ -278,16 +222,19 @@ export async function createOrder(
       'X-Idempotency-Key': randomUUID(),
     }
 
-    // =====================================================
-    // DEVICE ID
-    // =====================================================
+    // Só adiciona se existir um ID oficial configurado
+    if (mercadoPagoIntegratorId) {
+      headers['X-Integrator-Id'] =
+        mercadoPagoIntegratorId
 
-    if (deviceId) {
-      headers['X-meli-session-id'] = deviceId
+      console.log(
+        'X-Integrator-Id configurado:',
+        mercadoPagoIntegratorId,
+      )
     }
 
     // =====================================================
-    // 11. ENVIA PARA O MERCADO PAGO
+    // 10. ENVIA PARA O MERCADO PAGO
     // =====================================================
 
     const response = await fetch(
@@ -312,7 +259,7 @@ export async function createOrder(
     console.log('=================================')
 
     // =====================================================
-    // 12. ERRO DO MERCADO PAGO
+    // 11. ERRO DO MERCADO PAGO
     // =====================================================
 
     if (!response.ok) {
@@ -336,7 +283,7 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 13. CONVERTE RESPOSTA
+    // 12. CONVERTE RESPOSTA PARA JSON
     // =====================================================
 
     let mercadoPagoOrder: any
@@ -351,17 +298,22 @@ export async function createOrder(
 
       return {
         ok: false,
-        error: 'O Mercado Pago retornou uma resposta inválida.',
+        error:
+          'O Mercado Pago retornou uma resposta inválida.',
       }
     }
 
     console.log(
       'Resposta completa:',
-      JSON.stringify(mercadoPagoOrder, null, 2),
+      JSON.stringify(
+        mercadoPagoOrder,
+        null,
+        2,
+      ),
     )
 
     // =====================================================
-    // 14. PEGA ID DA ORDER
+    // 13. ID DO PEDIDO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoOrderId = String(
@@ -371,14 +323,15 @@ export async function createOrder(
     )
 
     // =====================================================
-    // 15. SALVA ID DO MERCADO PAGO
+    // 14. SALVA ID NO BANCO
     // =====================================================
 
     if (mercadoPagoOrderId) {
       const { error: updateError } = await admin
         .from('orders')
         .update({
-          payment_preference_id: mercadoPagoOrderId,
+          payment_preference_id:
+            mercadoPagoOrderId,
         })
         .eq('id', order.id)
 
@@ -391,42 +344,59 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 16. PROCURA DADOS DO PIX
+    // 15. PROCURA OS DADOS DO PIX
     // =====================================================
 
     const transaction =
-      mercadoPagoOrder.transactions?.payments?.[0] ??
-      mercadoPagoOrder.transaction?.payments?.[0] ??
+      mercadoPagoOrder.transactions
+        ?.payments?.[0] ??
+      mercadoPagoOrder.transaction
+        ?.payments?.[0] ??
       mercadoPagoOrder.payments?.[0] ??
       null
 
     const qrCode =
       transaction?.payment_method?.qr_code ??
       transaction?.qr_code ??
-      transaction?.point_of_interaction?.transaction_data?.qr_code ??
+      transaction?.point_of_interaction
+        ?.transaction_data?.qr_code ??
       mercadoPagoOrder.qr_code ??
-      mercadoPagoOrder.point_of_interaction?.transaction_data?.qr_code ??
+      mercadoPagoOrder.point_of_interaction
+        ?.transaction_data?.qr_code ??
       null
 
     const qrCodeBase64 =
-      transaction?.payment_method?.qr_code_base64 ??
-      transaction?.qr_code_base64 ??
-      transaction?.point_of_interaction?.transaction_data?.qr_code_base64 ??
-      mercadoPagoOrder.qr_code_base64 ??
-      mercadoPagoOrder.point_of_interaction?.transaction_data
+      transaction?.payment_method
         ?.qr_code_base64 ??
+      transaction?.qr_code_base64 ??
+      transaction?.point_of_interaction
+        ?.transaction_data?.qr_code_base64 ??
+      mercadoPagoOrder.qr_code_base64 ??
+      mercadoPagoOrder.point_of_interaction
+        ?.transaction_data?.qr_code_base64 ??
       null
 
     console.log('=================================')
     console.log('PIX CRIADO COM SUCESSO')
     console.log('Pedido interno:', order.id)
-    console.log('Pedido Mercado Pago:', mercadoPagoOrderId)
+    console.log(
+      'Pedido Mercado Pago:',
+      mercadoPagoOrderId,
+    )
+    console.log(
+      'Application ID retornado:',
+      mercadoPagoOrder.integration_data
+        ?.application_id ?? 'Não informado',
+    )
     console.log('Tem QR Code:', !!qrCode)
-    console.log('Tem QR Base64:', !!qrCodeBase64)
+    console.log(
+      'Tem QR Base64:',
+      !!qrCodeBase64,
+    )
     console.log('=================================')
 
     // =====================================================
-    // 17. RETORNA PARA O SITE
+    // 16. RETORNA PARA O SITE
     // =====================================================
 
     return {
@@ -438,7 +408,10 @@ export async function createOrder(
     }
   } catch (error) {
     console.error('=================================')
-    console.error('ERRO GERAL AO CRIAR PAGAMENTO:', error)
+    console.error(
+      'ERRO GERAL AO CRIAR PAGAMENTO:',
+      error,
+    )
     console.error('=================================')
 
     const message =
