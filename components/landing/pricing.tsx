@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Check, Copy, Loader2, X } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
 import { createOrder } from '@/app/actions/orders'
@@ -17,8 +18,7 @@ export type Product = {
   description: string | null
 }
 
-type PixPayment = {
-  product: Product
+type PaymentData = {
   orderId: string
   qrCode: string | null
   qrCodeBase64: string | null
@@ -30,11 +30,13 @@ const featuresByScreens: Record<number, string[]> = {
     'Acesso por 30 dias',
     'Suporte via WhatsApp',
   ],
+
   5: [
     '5 telas simultâneas',
     'Acesso por 30 dias',
     'Suporte prioritário',
   ],
+
   10: [
     '10 telas simultâneas',
     'Acesso por 30 dias',
@@ -51,10 +53,12 @@ export function Pricing({
   isLoggedIn: boolean
 }) {
   const router = useRouter()
+
   const [pending, startTransition] = useTransition()
+
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [pixPayment, setPixPayment] =
-    useState<PixPayment | null>(null)
+
+  const [payment, setPayment] = useState<PaymentData | null>(null)
 
   function handleBuy(product: Product) {
     if (!isLoggedIn) {
@@ -65,32 +69,47 @@ export function Pricing({
     setActiveId(product.id)
 
     startTransition(async () => {
-      const res = await createOrder(product.id)
+      try {
+        const res = await createOrder(product.id)
 
-      if (res.ok) {
-        setPixPayment({
-          product,
-          orderId: res.orderId,
-          qrCode: res.qrCode,
-          qrCodeBase64: res.qrCodeBase64,
-        })
+        if (res.ok) {
+          console.log('Pagamento criado:', res)
 
-        toast.success('PIX gerado com sucesso!')
-      } else if (res.needsAuth) {
-        router.push('/auth/login?next=/minha-conta')
-      } else {
-        toast.error(res.error)
+          setPayment({
+            orderId: res.orderId,
+            qrCode: res.qrCode,
+            qrCodeBase64: res.qrCodeBase64,
+          })
+
+          toast.success('Pagamento PIX gerado com sucesso!')
+        } else if (res.needsAuth) {
+          router.push('/auth/login?next=/minha-conta')
+        } else {
+          console.error('Erro no pagamento:', res.error)
+
+          toast.error(res.error)
+        }
+      } catch (error) {
+        console.error('Erro inesperado:', error)
+
+        toast.error(
+          'Ocorreu um erro inesperado ao gerar o pagamento.',
+        )
+      } finally {
+        setActiveId(null)
       }
-
-      setActiveId(null)
     })
   }
 
-  async function copyPix() {
-    if (!pixPayment?.qrCode) return
+  async function copyPixCode() {
+    if (!payment?.qrCode) {
+      toast.error('Código PIX não disponível.')
+      return
+    }
 
     try {
-      await navigator.clipboard.writeText(pixPayment.qrCode)
+      await navigator.clipboard.writeText(payment.qrCode)
+
       toast.success('Código PIX copiado!')
     } catch {
       toast.error('Não foi possível copiar o código PIX.')
@@ -98,6 +117,13 @@ export function Pricing({
   }
 
   const highlighted = 5
+
+  const qrImage =
+    payment?.qrCodeBase64
+      ? payment.qrCodeBase64.startsWith('data:image')
+        ? payment.qrCodeBase64
+        : `data:image/png;base64,${payment.qrCodeBase64}`
+      : null
 
   return (
     <>
@@ -112,7 +138,7 @@ export function Pricing({
             </h2>
 
             <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
-              Escolha a quantidade de telas ideal. Sem fidelidade, sem surpresas.
+              Escolha a quantidade de telas ideal para você.
             </p>
           </div>
 
@@ -180,7 +206,9 @@ export function Pricing({
                   <Button
                     className="mt-8"
                     variant={
-                      isHighlight ? 'default' : 'secondary'
+                      isHighlight
+                        ? 'default'
+                        : 'secondary'
                     }
                     onClick={() => handleBuy(product)}
                     disabled={loading}
@@ -201,12 +229,12 @@ export function Pricing({
         </div>
       </section>
 
-      {pixPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-xl">
+      {payment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
             <button
               type="button"
-              onClick={() => setPixPayment(null)}
+              onClick={() => setPayment(null)}
               className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Fechar"
             >
@@ -214,66 +242,58 @@ export function Pricing({
             </button>
 
             <div className="text-center">
-              <h2 className="text-xl font-bold">
-                Pagamento via PIX
+              <h2 className="text-2xl font-bold">
+                Pague com PIX
               </h2>
 
               <p className="mt-2 text-sm text-muted-foreground">
-                Escaneie o QR Code ou copie o código PIX abaixo.
-              </p>
-            </div>
-
-            <div className="mt-6 rounded-xl bg-muted p-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                {pixPayment.product.name}
+                Escaneie o QR Code ou copie o código PIX.
               </p>
 
-              <p className="mt-1 text-2xl font-bold">
-                {formatBRL(
-                  pixPayment.product.price_cents,
-                )}
-              </p>
-            </div>
-
-            <div className="mt-6 flex justify-center">
-              {pixPayment.qrCodeBase64 ? (
-                <img
-                  src={`data:image/png;base64,${pixPayment.qrCodeBase64}`}
-                  alt="QR Code PIX"
-                  className="h-52 w-52 rounded-lg bg-white p-2"
-                />
+              {qrImage ? (
+                <div className="mt-6 flex justify-center">
+                  <div className="rounded-xl bg-white p-3">
+                    <img
+                      src={qrImage}
+                      alt="QR Code PIX"
+                      className="h-56 w-56"
+                    />
+                  </div>
+                </div>
               ) : (
-                <div className="flex h-52 w-52 items-center justify-center rounded-lg border text-center text-sm text-muted-foreground">
-                  QR Code indisponível
+                <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                  O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
                 </div>
               )}
+
+              {payment.qrCode && (
+                <>
+                  <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+                    {payment.qrCode}
+                  </div>
+
+                  <Button
+                    className="mt-4 w-full"
+                    onClick={copyPixCode}
+                  >
+                    <Copy className="size-4" />
+                    Copiar código PIX
+                  </Button>
+                </>
+              )}
+
+              <p className="mt-5 text-xs text-muted-foreground">
+                Pedido: {payment.orderId}
+              </p>
+
+              <Button
+                variant="outline"
+                className="mt-4 w-full"
+                onClick={() => setPayment(null)}
+              >
+                Fechar
+              </Button>
             </div>
-
-            {pixPayment.qrCode && (
-              <div className="mt-6">
-                <p className="mb-2 text-sm font-medium">
-                  PIX Copia e Cola
-                </p>
-
-                <div className="rounded-lg border bg-muted/50 p-3">
-                  <p className="max-h-24 overflow-y-auto break-all text-xs text-muted-foreground">
-                    {pixPayment.qrCode}
-                  </p>
-                </div>
-
-                <Button
-                  className="mt-3 w-full"
-                  onClick={copyPix}
-                >
-                  <Copy className="size-4" />
-                  Copiar código PIX
-                </Button>
-              </div>
-            )}
-
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Após o pagamento ser confirmado, seu pedido será liberado automaticamente.
-            </p>
           </div>
         </div>
       )}
