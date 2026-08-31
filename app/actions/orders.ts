@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type BuyResult =
   | {
@@ -20,22 +21,24 @@ type BuyResult =
 export async function createOrder(productId: string): Promise<BuyResult> {
   try {
     // =====================================================
-    // VERIFICA TOKEN DO MERCADO PAGO
+    // 1. VERIFICA TOKEN DO MERCADO PAGO
     // =====================================================
 
-    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
+    const mercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
+
+    if (!mercadoPagoToken) {
       return {
         ok: false,
         error:
-          'O pagamento ainda não foi configurado. A variável MERCADO_PAGO_ACCESS_TOKEN não foi encontrada.',
+          'O pagamento ainda não foi configurado. MERCADO_PAGO_ACCESS_TOKEN não encontrado.',
       }
     }
 
-    const supabase = await createClient()
+    // =====================================================
+    // 2. CLIENTE NORMAL: SOMENTE PARA VERIFICAR LOGIN
+    // =====================================================
 
-    // =====================================================
-    // VERIFICA USUÁRIO LOGADO
-    // =====================================================
+    const supabase = await createClient()
 
     const {
       data: { user },
@@ -60,15 +63,20 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // CONVERTE O ID DO BOTÃO PARA QUANTIDADE DE TELAS
+    // 3. CLIENTE ADMIN
+    // IGNORA AS RESTRIÇÕES RLS NO SERVIDOR
+    // =====================================================
+
+    const admin = createAdminClient()
+
+    // =====================================================
+    // 4. CONVERTE O ID DO BOTÃO PARA NÚMERO DE TELAS
     // =====================================================
 
     const plans: Record<string, number> = {
       'plano-1-tela': 1,
       'plano-1-telas': 1,
-
       'plano-5-telas': 5,
-
       'plano-10-telas': 10,
     }
 
@@ -79,18 +87,22 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
       return {
         ok: false,
-        error: `Plano inválido: ${productId}`,
+        error: `Plano inválido recebido: ${productId}`,
       }
     }
 
-    console.log('Buscando plano com', screens, 'tela(s)')
+    console.log('=================================')
+    console.log('INICIANDO COMPRA')
+    console.log('Usuário:', user.id)
+    console.log('Plano recebido:', productId)
+    console.log('Quantidade de telas:', screens)
+    console.log('=================================')
 
     // =====================================================
-    // BUSCA PRODUTO NO SUPABASE
-    // NÃO PROCURA MAIS PELO UUID
+    // 5. BUSCA PRODUTO USANDO ADMIN CLIENT
     // =====================================================
 
-    const { data: product, error: productError } = await supabase
+    const { data: product, error: productError } = await admin
       .from('products')
       .select('id, name, screens, price_cents, active')
       .eq('screens', screens)
@@ -114,10 +126,10 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // CRIA PEDIDO NO BANCO
+    // 6. CRIA O PEDIDO NO BANCO
     // =====================================================
 
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await admin
       .from('orders')
       .insert({
         user_id: user.id,
@@ -133,28 +145,30 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
       return {
         ok: false,
-        error: `Não foi possível registrar o pedido: ${
+        error: `Não foi possível criar o pedido: ${
           orderError?.message ?? 'Erro desconhecido'
         }`,
       }
     }
 
+    console.log('Pedido criado:', order.id)
+
     // =====================================================
-    // VALOR EM REAIS
+    // 7. CONVERTE O VALOR DE CENTAVOS PARA REAIS
     // =====================================================
 
     const amount = (product.price_cents / 100).toFixed(2)
 
     console.log('=================================')
-    console.log('CRIANDO PAGAMENTO')
+    console.log('CRIANDO PIX')
     console.log('Produto:', product.name)
     console.log('Telas:', product.screens)
     console.log('Valor:', amount)
-    console.log('Order ID:', order.id)
+    console.log('Pedido:', order.id)
     console.log('=================================')
 
     // =====================================================
-    // DADOS DO PEDIDO PARA MERCADO PAGO
+    // 8. MONTA O PEDIDO PARA O MERCADO PAGO
     // =====================================================
 
     const mercadoPagoBody = {
@@ -169,7 +183,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       description: product.name,
 
       payer: {
-        email: user.email ?? 'cliente@jntelas.com',
+        email: user.email || 'cliente@jntelas.com',
       },
 
       transactions: {
@@ -187,7 +201,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // ENVIA PARA O MERCADO PAGO
+    // 9. ENVIA O PEDIDO PARA O MERCADO PAGO
     // =====================================================
 
     const response = await fetch(
@@ -196,7 +210,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
         method: 'POST',
 
         headers: {
-          Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${mercadoPagoToken}`,
           'Content-Type': 'application/json',
           'X-Idempotency-Key': randomUUID(),
         },
@@ -209,11 +223,14 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
     const responseText = await response.text()
 
-    console.log('Status Mercado Pago:', response.status)
-    console.log('Resposta Mercado Pago:', responseText)
+    console.log('=================================')
+    console.log('RESPOSTA MERCADO PAGO')
+    console.log('Status:', response.status)
+    console.log('Resposta:', responseText)
+    console.log('=================================')
 
     // =====================================================
-    // VERIFICA ERRO DO MERCADO PAGO
+    // 10. SE O MERCADO PAGO DER ERRO
     // =====================================================
 
     if (!response.ok) {
@@ -223,8 +240,8 @@ export async function createOrder(productId: string): Promise<BuyResult> {
         responseText,
       )
 
-      // Cancela o pedido criado caso o Mercado Pago dê erro
-      await supabase
+      // Marca o pedido como cancelado
+      await admin
         .from('orders')
         .update({
           status: 'cancelled',
@@ -238,16 +255,16 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     // =====================================================
-    // CONVERTE RESPOSTA JSON
+    // 11. CONVERTE A RESPOSTA PARA JSON
     // =====================================================
 
     let mercadoPagoOrder: any
 
     try {
       mercadoPagoOrder = JSON.parse(responseText)
-    } catch (parseError) {
+    } catch {
       console.error(
-        'Erro ao interpretar resposta:',
+        'Resposta inválida do Mercado Pago:',
         responseText,
       )
 
@@ -258,22 +275,26 @@ export async function createOrder(productId: string): Promise<BuyResult> {
     }
 
     console.log(
-      'Resposta completa Mercado Pago:',
+      'Resposta completa:',
       JSON.stringify(mercadoPagoOrder, null, 2),
     )
 
     // =====================================================
-    // SALVA ID DO PAGAMENTO NO SUPABASE
+    // 12. PEGA O ID DO PEDIDO DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoOrderId = String(
       mercadoPagoOrder.id ??
-      mercadoPagoOrder.order_id ??
-      '',
+        mercadoPagoOrder.order_id ??
+        '',
     )
 
+    // =====================================================
+    // 13. SALVA O ID DO MERCADO PAGO
+    // =====================================================
+
     if (mercadoPagoOrderId) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await admin
         .from('orders')
         .update({
           payment_preference_id: mercadoPagoOrderId,
@@ -282,14 +303,14 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
       if (updateError) {
         console.error(
-          'Erro ao salvar ID Mercado Pago:',
+          'Erro ao salvar ID do Mercado Pago:',
           updateError,
         )
       }
     }
 
     // =====================================================
-    // PROCURA DADOS DO PIX
+    // 14. PROCURA OS DADOS DO PIX
     // =====================================================
 
     const transaction =
@@ -315,14 +336,15 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       null
 
     console.log('=================================')
-    console.log('PIX CRIADO')
-    console.log('Mercado Pago ID:', mercadoPagoOrderId)
-    console.log('QR Code:', !!qrCode)
-    console.log('QR Base64:', !!qrCodeBase64)
+    console.log('PIX CRIADO COM SUCESSO')
+    console.log('Pedido interno:', order.id)
+    console.log('Pedido Mercado Pago:', mercadoPagoOrderId)
+    console.log('Tem QR Code:', !!qrCode)
+    console.log('Tem QR Base64:', !!qrCodeBase64)
     console.log('=================================')
 
     // =====================================================
-    // RETORNA PARA O SITE
+    // 15. RETORNA OS DADOS PARA O SITE
     // =====================================================
 
     return {
@@ -333,7 +355,9 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       qrCodeBase64,
     }
   } catch (error) {
+    console.error('=================================')
     console.error('ERRO GERAL AO CRIAR PAGAMENTO:', error)
+    console.error('=================================')
 
     const message =
       error instanceof Error
@@ -342,7 +366,7 @@ export async function createOrder(productId: string): Promise<BuyResult> {
 
     return {
       ok: false,
-      error: `Erro ao conectar com o Mercado Pago: ${message}`,
+      error: `Erro ao criar pagamento: ${message}`,
     }
   }
 }
