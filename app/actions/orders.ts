@@ -185,9 +185,8 @@ export async function createOrder(productId: string): Promise<BuyResult> {
       description: product.name,
 
       payer: {
-        // No ambiente de teste o Mercado Pago exige
-        // um e-mail de conta de teste
-        email: 'test_user@testuser.com',
+        // E-mail usado para o ambiente de teste
+        email: 'test_user_br@testuser.com',
       },
 
       transactions: {
