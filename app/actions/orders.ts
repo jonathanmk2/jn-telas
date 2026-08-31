@@ -23,11 +23,10 @@ export async function createOrder(
 ): Promise<BuyResult> {
   try {
     // =====================================================
-    // 1. TOKEN DO MERCADO PAGO
+    // 1. TOKEN DO MERCADO PAGO - PRODUÇÃO
     // =====================================================
 
     const mercadoPagoToken =
-      process.env.MERCADO_PAGO_TEST_ACCESS_TOKEN ||
       process.env.MERCADO_PAGO_ACCESS_TOKEN
 
     if (!mercadoPagoToken) {
@@ -38,9 +37,6 @@ export async function createOrder(
       }
     }
 
-    // Opcional:
-    // Só será enviado se você cadastrar um X-Integrator-Id
-    // OFICIAL fornecido pelo Mercado Pago.
     const mercadoPagoIntegratorId =
       process.env.MERCADO_PAGO_INTEGRATOR_ID
 
@@ -56,7 +52,10 @@ export async function createOrder(
     } = await supabase.auth.getUser()
 
     if (userError) {
-      console.error('Erro ao verificar usuário:', userError)
+      console.error(
+        'Erro ao verificar usuário:',
+        userError,
+      )
 
       return {
         ok: false,
@@ -67,7 +66,8 @@ export async function createOrder(
     if (!user) {
       return {
         ok: false,
-        error: 'Você precisa entrar na sua conta para comprar.',
+        error:
+          'Você precisa entrar na sua conta para comprar.',
         needsAuth: true,
       }
     }
@@ -92,7 +92,10 @@ export async function createOrder(
     const screens = plans[productId]
 
     if (!screens) {
-      console.error('Plano inválido recebido:', productId)
+      console.error(
+        'Plano inválido recebido:',
+        productId,
+      )
 
       return {
         ok: false,
@@ -101,7 +104,7 @@ export async function createOrder(
     }
 
     console.log('=================================')
-    console.log('INICIANDO COMPRA')
+    console.log('INICIANDO COMPRA - PRODUÇÃO')
     console.log('Usuário:', user.id)
     console.log('Plano recebido:', productId)
     console.log('Quantidade de telas:', screens)
@@ -111,15 +114,23 @@ export async function createOrder(
     // 5. BUSCA O PRODUTO
     // =====================================================
 
-    const { data: product, error: productError } = await admin
+    const {
+      data: product,
+      error: productError,
+    } = await admin
       .from('products')
-      .select('id, name, screens, price_cents, active')
+      .select(
+        'id, name, screens, price_cents, active',
+      )
       .eq('screens', screens)
       .eq('active', true)
       .single()
 
     if (productError) {
-      console.error('Erro ao buscar produto:', productError)
+      console.error(
+        'Erro ao buscar produto:',
+        productError,
+      )
 
       return {
         ok: false,
@@ -138,7 +149,10 @@ export async function createOrder(
     // 6. CRIA O PEDIDO NO BANCO
     // =====================================================
 
-    const { data: order, error: orderError } = await admin
+    const {
+      data: order,
+      error: orderError,
+    } = await admin
       .from('orders')
       .insert({
         user_id: user.id,
@@ -150,12 +164,16 @@ export async function createOrder(
       .single()
 
     if (orderError || !order) {
-      console.error('Erro ao criar pedido:', orderError)
+      console.error(
+        'Erro ao criar pedido:',
+        orderError,
+      )
 
       return {
         ok: false,
         error: `Não foi possível criar o pedido: ${
-          orderError?.message ?? 'Erro desconhecido'
+          orderError?.message ??
+          'Erro desconhecido'
         }`,
       }
     }
@@ -171,12 +189,11 @@ export async function createOrder(
     ).toFixed(2)
 
     console.log('=================================')
-    console.log('CRIANDO PIX')
+    console.log('CRIANDO PIX - PRODUÇÃO')
     console.log('Produto:', product.name)
     console.log('Telas:', product.screens)
     console.log('Valor:', amount)
     console.log('Pedido:', order.id)
-    console.log('Application ID:', '341541894748111')
     console.log('=================================')
 
     // =====================================================
@@ -195,7 +212,7 @@ export async function createOrder(
       description: product.name,
 
       payer: {
-        email: 'test_user_br@testuser.com',
+        email: user.email ?? undefined,
       },
 
       transactions: {
@@ -222,15 +239,9 @@ export async function createOrder(
       'X-Idempotency-Key': randomUUID(),
     }
 
-    // Só adiciona se existir um ID oficial configurado
     if (mercadoPagoIntegratorId) {
       headers['X-Integrator-Id'] =
         mercadoPagoIntegratorId
-
-      console.log(
-        'X-Integrator-Id configurado:',
-        mercadoPagoIntegratorId,
-      )
     }
 
     // =====================================================
@@ -241,11 +252,8 @@ export async function createOrder(
       'https://api.mercadopago.com/v1/orders',
       {
         method: 'POST',
-
         headers,
-
         body: JSON.stringify(mercadoPagoBody),
-
         cache: 'no-store',
       },
     )
@@ -289,7 +297,8 @@ export async function createOrder(
     let mercadoPagoOrder: any
 
     try {
-      mercadoPagoOrder = JSON.parse(responseText)
+      mercadoPagoOrder =
+        JSON.parse(responseText)
     } catch {
       console.error(
         'Resposta inválida do Mercado Pago:',
@@ -302,15 +311,6 @@ export async function createOrder(
           'O Mercado Pago retornou uma resposta inválida.',
       }
     }
-
-    console.log(
-      'Resposta completa:',
-      JSON.stringify(
-        mercadoPagoOrder,
-        null,
-        2,
-      ),
-    )
 
     // =====================================================
     // 13. ID DO PEDIDO MERCADO PAGO
@@ -327,13 +327,14 @@ export async function createOrder(
     // =====================================================
 
     if (mercadoPagoOrderId) {
-      const { error: updateError } = await admin
-        .from('orders')
-        .update({
-          payment_preference_id:
-            mercadoPagoOrderId,
-        })
-        .eq('id', order.id)
+      const { error: updateError } =
+        await admin
+          .from('orders')
+          .update({
+            payment_preference_id:
+              mercadoPagoOrderId,
+          })
+          .eq('id', order.id)
 
       if (updateError) {
         console.error(
@@ -383,11 +384,6 @@ export async function createOrder(
       'Pedido Mercado Pago:',
       mercadoPagoOrderId,
     )
-    console.log(
-      'Application ID retornado:',
-      mercadoPagoOrder.integration_data
-        ?.application_id ?? 'Não informado',
-    )
     console.log('Tem QR Code:', !!qrCode)
     console.log(
       'Tem QR Base64:',
@@ -421,7 +417,8 @@ export async function createOrder(
 
     return {
       ok: false,
-      error: `Erro ao criar pagamento: ${message}`,
+      error:
+        `Erro ao criar pagamento: ${message}`,
     }
   }
 }
