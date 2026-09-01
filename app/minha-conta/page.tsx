@@ -21,22 +21,31 @@ export default async function MinhaContaPage() {
     redirect('/auth/login?next=/minha-conta')
   }
 
-  const { data: profile } = await supabase
+  console.log('=================================')
+  console.log('MINHA CONTA - USUÁRIO LOGADO')
+  console.log('USER ID:', user.id)
+  console.log('USER EMAIL:', user.email)
+  console.log('=================================')
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('full_name, email, is_admin')
     .eq('id', user.id)
     .single()
 
-  // Busca apenas os códigos vinculados ao usuário logado
+  console.log('PERFIL:', profile)
+  console.log('ERRO PERFIL:', profileError)
+
+  // Busca SOMENTE os códigos vinculados ao usuário logado
   const { data: codes, error: codesError } = await supabase
     .from('activation_codes')
     .select(`
       id,
       code,
+      user_id,
       status,
       assigned_at,
       created_at,
-      user_id,
       products (
         name,
         screens
@@ -45,11 +54,15 @@ export default async function MinhaContaPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (codesError) {
-    console.error('ERRO AO BUSCAR CÓDIGOS:', codesError)
-  }
+  console.log('=================================')
+  console.log('BUSCANDO CÓDIGOS')
+  console.log('USER ID USADO NA BUSCA:', user.id)
+  console.log('CÓDIGOS ENCONTRADOS:', codes)
+  console.log('QUANTIDADE DE CÓDIGOS:', codes?.length ?? 0)
+  console.log('ERRO DOS CÓDIGOS:', codesError)
+  console.log('=================================')
 
-  // Busca apenas os pedidos do usuário logado
+  // Busca SOMENTE os pedidos vinculados ao usuário logado
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -57,7 +70,6 @@ export default async function MinhaContaPage() {
       status,
       total_cents,
       created_at,
-      user_id,
       products (
         name
       )
@@ -65,9 +77,13 @@ export default async function MinhaContaPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (ordersError) {
-    console.error('ERRO AO BUSCAR PEDIDOS:', ordersError)
-  }
+  console.log('=================================')
+  console.log('BUSCANDO PEDIDOS')
+  console.log('USER ID USADO NA BUSCA:', user.id)
+  console.log('PEDIDOS ENCONTRADOS:', orders)
+  console.log('QUANTIDADE DE PEDIDOS:', orders?.length ?? 0)
+  console.log('ERRO DOS PEDIDOS:', ordersError)
+  console.log('=================================')
 
   const codeList = codes ?? []
   const orderList = orders ?? []
