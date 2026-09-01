@@ -5,23 +5,34 @@ export function formatBRL(cents: number): string {
   }).format(cents / 100)
 }
 
-export function formatDate(value: string | Date | null | undefined): string {
+const BRAZIL_TIME_ZONE = 'America/Sao_Paulo'
+
+export function formatDate(
+  value: string | Date | null | undefined,
+): string {
   if (!value) return '—'
+
   return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIME_ZONE,
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   }).format(new Date(value))
 }
 
-export function formatDateTime(value: string | Date | null | undefined): string {
+export function formatDateTime(
+  value: string | Date | null | undefined,
+): string {
   if (!value) return '—'
+
   return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIME_ZONE,
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   }).format(new Date(value))
 }
 
