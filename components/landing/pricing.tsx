@@ -155,7 +155,7 @@ export function Pricing({
   }
 
   // ============================================
-  // VERIFICA STATUS DO PAGAMENTO
+  // VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
   // ============================================
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export function Pricing({
         setCheckingPayment(true)
 
         const response = await fetch(
-          `/api/orders/${payment.orderId}/status`,
+          `/api/payment-status?orderId=${payment.orderId}`,
           {
             method: 'GET',
             cache: 'no-store',
@@ -186,6 +186,10 @@ export function Pricing({
         )
 
         if (!response.ok) {
+          console.error(
+            'Erro ao consultar status do pagamento.',
+          )
+
           return
         }
 
@@ -201,7 +205,8 @@ export function Pricing({
         )
 
         const newStatus =
-          data.status as OrderStatus
+          (data.status as OrderStatus) ??
+          'unknown'
 
         setOrderStatus(newStatus)
 
@@ -234,8 +239,7 @@ export function Pricing({
     // Verifica imediatamente
     checkPayment()
 
-    // Depois verifica automaticamente
-    // a cada 3 segundos
+    // Verifica novamente a cada 3 segundos
     const interval = setInterval(
       checkPayment,
       3000,
@@ -331,20 +335,18 @@ export function Pricing({
                   </div>
 
                   <ul className="mt-6 flex flex-1 flex-col gap-3">
-                    {features.map(
-                      (feature) => (
-                        <li
-                          key={feature}
-                          className="flex items-start gap-2 text-sm"
-                        >
-                          <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                    {features.map((feature) => (
+                      <li
+                        key={feature}
+                        className="flex items-start gap-2 text-sm"
+                      >
+                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
 
-                          <span className="text-muted-foreground">
-                            {feature}
-                          </span>
-                        </li>
-                      ),
-                    )}
+                        <span className="text-muted-foreground">
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
 
                   <Button
@@ -390,9 +392,7 @@ export function Pricing({
               <X className="size-5" />
             </button>
 
-            {/* ================================= */}
             {/* PAGAMENTO CONFIRMADO */}
-            {/* ================================= */}
 
             {paymentConfirmed ? (
               <div className="py-6 text-center">
@@ -405,20 +405,18 @@ export function Pricing({
                 </h2>
 
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Seu pagamento foi aprovado com
-                  sucesso.
+                  Seu pagamento foi aprovado com sucesso.
                 </p>
 
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Seus códigos já foram adicionados
-                  à sua conta.
+                  Seus códigos já foram adicionados à sua conta.
                 </p>
 
                 <Button
                   className="mt-8 w-full"
                   onClick={() => {
-                    router.push('/minha-conta')
                     setPayment(null)
+                    router.push('/minha-conta')
                   }}
                 >
                   Ver meus códigos
@@ -435,9 +433,7 @@ export function Pricing({
                 </Button>
               </div>
             ) : orderStatus === 'cancelled' ? (
-              /* ================================= */
               /* PAGAMENTO CANCELADO */
-              /* ================================= */
 
               <div className="py-6 text-center">
                 <h2 className="text-2xl font-bold">
@@ -451,17 +447,15 @@ export function Pricing({
                 <Button
                   variant="outline"
                   className="mt-8 w-full"
-                  onClick={() =>
+                  onClick={() => {
                     setPayment(null)
-                  }
+                  }}
                 >
                   Fechar
                 </Button>
               </div>
             ) : (
-              /* ================================= */
               /* AGUARDANDO PAGAMENTO */
-              /* ================================= */
 
               <div className="text-center">
                 <h2 className="text-2xl font-bold">
@@ -469,8 +463,7 @@ export function Pricing({
                 </h2>
 
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Escaneie o QR Code ou copie o
-                  código PIX.
+                  Escaneie o QR Code ou copie o código PIX.
                 </p>
 
                 {qrImage ? (
@@ -485,9 +478,7 @@ export function Pricing({
                   </div>
                 ) : (
                   <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
-                    O pagamento foi criado, mas o
-                    QR Code não foi encontrado na
-                    resposta.
+                    O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
                   </div>
                 )}
 
@@ -510,21 +501,17 @@ export function Pricing({
                 {/* STATUS AUTOMÁTICO */}
 
                 <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  {checkingPayment ? (
-                    <Loader2 className="size-4 animate-spin text-primary" />
-                  ) : (
-                    <Loader2 className="size-4 animate-spin text-primary" />
-                  )}
+                  <Loader2 className="size-4 animate-spin text-primary" />
 
                   <span>
-                    Aguardando confirmação do
-                    pagamento...
+                    {checkingPayment
+                      ? 'Verificando pagamento...'
+                      : 'Aguardando confirmação do pagamento...'}
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Esta página verifica
-                  automaticamente seu pagamento.
+                  Esta página verifica automaticamente seu pagamento.
                 </p>
 
                 <p className="mt-5 text-xs text-muted-foreground">
@@ -534,9 +521,9 @@ export function Pricing({
                 <Button
                   variant="outline"
                   className="mt-4 w-full"
-                  onClick={() =>
+                  onClick={() => {
                     setPayment(null)
-                  }
+                  }}
                 >
                   Fechar
                 </Button>
