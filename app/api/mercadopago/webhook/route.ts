@@ -374,6 +374,10 @@ async function processPayment({
 
     // =====================================================
     // DESCOBRE QUANTOS CÓDIGOS ENTREGAR
+    //
+    // 1 tela  = 1 código
+    // 5 telas = 5 códigos
+    // 10 telas = 10 códigos
     // =====================================================
 
     const product = Array.isArray(order.products)
@@ -465,7 +469,8 @@ async function processPayment({
       // IMPORTANTE:
       // NÃO FILTRA product_id.
       //
-      // Todos os códigos pertencem ao mesmo estoque.
+      // TODOS OS CÓDIGOS PERTENCEM
+      // AO MESMO ESTOQUE.
       // ===================================================
 
       console.log('=================================')
@@ -525,8 +530,8 @@ async function processPayment({
         )
         console.error('=================================')
 
-        // O pedido fica como PAID.
-        // Não será marcado como DELIVERED.
+        // Pedido continua como PAID.
+        // Não marca como DELIVERED.
         return
       }
 
@@ -571,8 +576,10 @@ async function processPayment({
       const deliveredCodes =
         assignedCodes ?? []
 
-      // Segurança extra:
-      // confirma que todos foram realmente atribuídos.
+      // ===================================================
+      // CONFIRMA QUE TODOS FORAM ATRIBUÍDOS
+      // ===================================================
+
       if (
         deliveredCodes.length !== quantity
       ) {
@@ -611,8 +618,8 @@ async function processPayment({
       // activation_code_id guarda apenas o primeiro código
       // por compatibilidade com sua tabela atual.
       //
-      // Os demais códigos ficam vinculados ao usuário
-      // diretamente em activation_codes.user_id.
+      // TODOS os códigos estão vinculados ao usuário
+      // através de activation_codes.user_id.
       // ===================================================
 
       const {
