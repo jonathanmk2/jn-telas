@@ -1,6 +1,14 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { KeyRound, ShoppingBag, Ticket, Shield } from 'lucide-react'
+import {
+  KeyRound,
+  ShoppingBag,
+  Ticket,
+  Shield,
+  ChevronDown,
+  PackageCheck,
+} from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { DashboardNavbar } from '@/components/dashboard/dashboard-navbar'
 import { CopyButton } from '@/components/copy-button'
@@ -9,6 +17,43 @@ import { createClient } from '@/lib/supabase/server'
 import { formatBRL, formatDate } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
+
+type CodeItem = {
+  id: string
+  code: string
+  user_id: string | null
+  order_id: string | null
+  status: string
+  assigned_at: string | null
+  created_at: string
+  products:
+    | {
+        name: string
+        screens: number
+      }
+    | {
+        name: string
+        screens: number
+      }[]
+    | null
+}
+
+type OrderItem = {
+  id: string
+  status: string
+  total_cents: number
+  created_at: string
+  products:
+    | {
+        name: string
+        screens: number
+      }
+    | {
+        name: string
+        screens: number
+      }[]
+    | null
+}
 
 export default async function MinhaContaPage() {
   const supabase = await createClient()
@@ -21,28 +66,27 @@ export default async function MinhaContaPage() {
     redirect('/auth/login?next=/minha-conta')
   }
 
-  console.log('=================================')
-  console.log('MINHA CONTA - USUÁRIO LOGADO')
-  console.log('USER ID:', user.id)
-  console.log('USER EMAIL:', user.email)
-  console.log('=================================')
+  // =====================================================
+  // PERFIL
+  // =====================================================
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, email, is_admin')
     .eq('id', user.id)
     .single()
 
-  console.log('PERFIL:', profile)
-  console.log('ERRO PERFIL:', profileError)
+  // =====================================================
+  // CÓDIGOS DO USUÁRIO
+  // =====================================================
 
-  // Busca SOMENTE os códigos vinculados ao usuário logado
   const { data: codes, error: codesError } = await supabase
     .from('activation_codes')
     .select(`
       id,
       code,
       user_id,
+      order_id,
       status,
       assigned_at,
       created_at,
@@ -52,17 +96,16 @@ export default async function MinhaContaPage() {
       )
     `)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+    .order('assigned_at', { ascending: false })
 
-  console.log('=================================')
-  console.log('BUSCANDO CÓDIGOS')
-  console.log('USER ID USADO NA BUSCA:', user.id)
-  console.log('CÓDIGOS ENCONTRADOS:', codes)
-  console.log('QUANTIDADE DE CÓDIGOS:', codes?.length ?? 0)
-  console.log('ERRO DOS CÓDIGOS:', codesError)
-  console.log('=================================')
+  if (codesError) {
+    console.error('Erro ao buscar códigos:', codesError)
+  }
 
-  // Busca SOMENTE os pedidos vinculados ao usuário logado
+  // =====================================================
+  // PEDIDOS DO USUÁRIO
+  // =====================================================
+
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -71,28 +114,29 @@ export default async function MinhaContaPage() {
       total_cents,
       created_at,
       products (
-        name
+        name,
+        screens
       )
     `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  console.log('=================================')
-  console.log('BUSCANDO PEDIDOS')
-  console.log('USER ID USADO NA BUSCA:', user.id)
-  console.log('PEDIDOS ENCONTRADOS:', orders)
-  console.log('QUANTIDADE DE PEDIDOS:', orders?.length ?? 0)
-  console.log('ERRO DOS PEDIDOS:', ordersError)
-  console.log('=================================')
+  if (ordersError) {
+    console.error('Erro ao buscar pedidos:', ordersError)
+  }
 
-  const codeList = codes ?? []
-  const orderList = orders ?? []
+  const codeList = (codes ?? []) as CodeItem[]
+  const orderList = (orders ?? []) as OrderItem[]
 
   const firstName = (
     profile?.full_name ||
     user.email ||
     ''
   ).split(' ')[0]
+
+  const activeCodes = codeList.filter(
+    (code) => code.status === 'active',
+  ).length
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -101,7 +145,11 @@ export default async function MinhaContaPage() {
       />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        {/* ================================================= */}
+        {/* CABEÇALHO */}
+        {/* ================================================= */}
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
               Minha Conta
@@ -110,13 +158,17 @@ export default async function MinhaContaPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Olá
               {firstName ? `, ${firstName}` : ''}! Gerencie seus
-              códigos e compras aqui.
+              pedidos e códigos aqui.
             </p>
           </div>
 
           <div className="flex gap-2">
             {profile?.is_admin && (
-              <Button asChild variant="secondary" size="sm">
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+              >
                 <Link href="/admin">
                   <Shield className="size-4" />
                   Painel Admin
@@ -132,7 +184,10 @@ export default async function MinhaContaPage() {
           </div>
         </div>
 
+        {/* ================================================= */}
         {/* RESUMO */}
+        {/* ================================================= */}
+
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SummaryCard
             icon={Ticket}
@@ -143,11 +198,7 @@ export default async function MinhaContaPage() {
           <SummaryCard
             icon={KeyRound}
             label="Códigos ativos"
-            value={
-              codeList.filter(
-                (c) => c.status === 'active'
-              ).length
-            }
+            value={activeCodes}
           />
 
           <SummaryCard
@@ -157,146 +208,229 @@ export default async function MinhaContaPage() {
           />
         </div>
 
-        {/* MEUS CÓDIGOS */}
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold">
-            Meus Códigos
-          </h2>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            Todos os códigos de ativação vinculados à sua conta.
-          </p>
-
-          {codeList.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
-              <Ticket className="mx-auto size-8 text-muted-foreground" />
-
-              <p className="mt-3 text-sm text-muted-foreground">
-                Você ainda não possui códigos. Assim que sua compra
-                for confirmada, eles aparecerão aqui.
-              </p>
-
-              <Button asChild className="mt-4" size="sm">
-                <Link href="/#planos">
-                  Ver planos
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <ul className="mt-4 flex flex-col gap-3">
-              {codeList.map((c) => {
-                const product = Array.isArray(c.products)
-                  ? c.products[0]
-                  : c.products
-
-                return (
-                  <li
-                    key={c.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <code className="truncate rounded-md bg-secondary px-2 py-1 font-mono text-sm">
-                          {c.code}
-                        </code>
-
-                        <StatusBadge
-                          status={c.status}
-                          type="code"
-                        />
-                      </div>
-
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {product?.name ?? 'Plano'} · Adquirido em{' '}
-                        {formatDate(c.created_at)}
-                      </p>
-                    </div>
-
-                    <CopyButton
-                      value={c.code}
-                      className="shrink-0 self-start sm:self-auto"
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-
+        {/* ================================================= */}
         {/* MEUS PEDIDOS */}
+        {/* ================================================= */}
+
         <section className="mt-10">
           <h2 className="text-lg font-semibold">
             Meus Pedidos
           </h2>
 
           <p className="mt-1 text-sm text-muted-foreground">
-            Histórico das suas compras.
+            Visualize suas compras e os códigos recebidos em
+            cada pedido.
           </p>
 
           {orderList.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/40 p-8 text-center text-sm text-muted-foreground">
-              Nenhum pedido registrado ainda.
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
+              <ShoppingBag className="mx-auto size-8 text-muted-foreground" />
+
+              <p className="mt-3 text-sm text-muted-foreground">
+                Nenhum pedido registrado ainda.
+              </p>
+
+              <Button
+                asChild
+                className="mt-4"
+                size="sm"
+              >
+                <Link href="/#planos">
+                  Ver planos
+                </Link>
+              </Button>
             </div>
           ) : (
-            <div className="mt-4 overflow-hidden rounded-xl border border-border/60">
-              <table className="w-full text-sm">
-                <thead className="bg-card">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">
-                      Plano
-                    </th>
+            <div className="mt-4 space-y-4">
+              {orderList.map((order) => {
+                const product = Array.isArray(order.products)
+                  ? order.products[0]
+                  : order.products
 
-                    <th className="px-4 py-3 font-medium">
-                      Data
-                    </th>
+                const orderCodes = codeList.filter(
+                  (code) => code.order_id === order.id,
+                )
 
-                    <th className="px-4 py-3 font-medium">
-                      Valor
-                    </th>
+                const shortOrderId = order.id
+                  .replace(/-/g, '')
+                  .slice(0, 8)
+                  .toUpperCase()
 
-                    <th className="px-4 py-3 font-medium">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
+                return (
+                  <details
+                    key={order.id}
+                    className="group overflow-hidden rounded-xl border border-border/60 bg-card"
+                  >
+                    {/* ===================================== */}
+                    {/* CABEÇALHO DO PEDIDO */}
+                    {/* ===================================== */}
 
-                <tbody>
-                  {orderList.map((o) => {
-                    const product = Array.isArray(o.products)
-                      ? o.products[0]
-                      : o.products
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 transition hover:bg-secondary/20">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="font-semibold">
+                            Pedido #{shortOrderId}
+                          </span>
 
-                    return (
-                      <tr
-                        key={o.id}
-                        className="border-t border-border/60 bg-card/40"
-                      >
-                        <td className="px-4 py-3">
-                          {product?.name ?? 'Plano'}
-                        </td>
-
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(o.created_at)}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          {formatBRL(o.total_cents)}
-                        </td>
-
-                        <td className="px-4 py-3">
                           <StatusBadge
-                            status={o.status}
+                            status={order.status}
                             type="order"
                           />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+
+                          <span className="text-sm text-muted-foreground">
+                            ({orderCodes.length}{' '}
+                            {orderCodes.length === 1
+                              ? 'código'
+                              : 'códigos'})
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                          <span>
+                            {formatDate(order.created_at)}
+                          </span>
+
+                          <span>
+                            Plano:{' '}
+                            <strong className="font-medium text-foreground">
+                              {product?.name ?? 'Plano'}
+                            </strong>
+                          </span>
+
+                          <span>
+                            Total:{' '}
+                            <strong className="font-medium text-foreground">
+                              {formatBRL(order.total_cents)}
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="hidden text-sm font-medium sm:inline">
+                          Visualizar códigos
+                        </span>
+
+                        <ChevronDown className="size-5 transition-transform group-open:rotate-180" />
+                      </div>
+                    </summary>
+
+                    {/* ===================================== */}
+                    {/* CÓDIGOS DO PEDIDO */}
+                    {/* ===================================== */}
+
+                    <div className="border-t border-border/60 bg-background/30 p-4">
+                      {orderCodes.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                          <p className="text-sm text-muted-foreground">
+                            {order.status === 'delivered'
+                              ? 'Os códigos deste pedido ainda estão sendo organizados.'
+                              : 'Os códigos aparecerão aqui após a confirmação e entrega do pedido.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <PackageCheck className="size-4 text-primary" />
+                            Códigos deste pedido
+                          </div>
+
+                          {orderCodes.map((code) => (
+                            <div
+                              key={code.id}
+                              className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <code className="rounded-md bg-secondary px-2 py-1 font-mono text-sm">
+                                    {code.code}
+                                  </code>
+
+                                  <StatusBadge
+                                    status={code.status}
+                                    type="code"
+                                  />
+                                </div>
+
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  Código adquirido neste pedido
+                                </p>
+                              </div>
+
+                              <CopyButton
+                                value={code.code}
+                                className="shrink-0"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )
+              })}
             </div>
           )}
         </section>
+
+        {/* ================================================= */}
+        {/* CÓDIGOS ANTIGOS SEM PEDIDO */}
+        {/* ================================================= */}
+
+        {codeList.filter((code) => !code.order_id).length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-lg font-semibold">
+              Outros Códigos
+            </h2>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              Códigos adquiridos antes da organização por pedidos.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {codeList
+                .filter((code) => !code.order_id)
+                .map((code) => {
+                  const product = Array.isArray(code.products)
+                    ? code.products[0]
+                    : code.products
+
+                  return (
+                    <div
+                      key={code.id}
+                      className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="truncate rounded-md bg-secondary px-2 py-1 font-mono text-sm">
+                            {code.code}
+                          </code>
+
+                          <StatusBadge
+                            status={code.status}
+                            type="code"
+                          />
+                        </div>
+
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {product?.name ?? 'Plano'} · Adquirido em{' '}
+                          {formatDate(
+                            code.assigned_at ??
+                              code.created_at,
+                          )}
+                        </p>
+                      </div>
+
+                      <CopyButton
+                        value={code.code}
+                        className="shrink-0 self-start sm:self-auto"
+                      />
+                    </div>
+                  )
+                })}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )
