@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import {
@@ -12,7 +13,6 @@ import {
 } from '@/app/actions/admin'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/status-badge'
 import { formatBRL, formatDate } from '@/lib/format'
@@ -63,31 +63,11 @@ type ActionResult = {
   error?: string
 }
 
-async function runAction(
-  action: (fd: FormData) => Promise<ActionResult>,
-  fd: FormData,
-  done: () => void,
-) {
-  const result = await action(fd)
-
-  if (result.ok) {
-    toast.success(
-      result.message ?? 'Atualizado com sucesso.',
-    )
-
-    done()
-  } else {
-    toast.error(
-      result.error ??
-        'Não foi possível concluir a ação.',
-    )
-  }
-}
-
 export function AdminDashboard({
   customers,
   codes,
   orders,
+  productOptions,
   customerOptions,
 }: {
   customers: Customer[]
@@ -96,6 +76,8 @@ export function AdminDashboard({
   productOptions: ProductOption[]
   customerOptions: CustomerOption[]
 }) {
+  const router = useRouter()
+
   const [isPending, startTransition] =
     useTransition()
 
@@ -109,11 +91,33 @@ export function AdminDashboard({
       const fd = new FormData(form)
 
       startTransition(() => {
-        void runAction(
-          action,
-          fd,
-          () => form.reset(),
-        )
+        void (async () => {
+          try {
+            const result = await action(fd)
+
+            if (result.ok) {
+              toast.success(
+                result.message ??
+                  'Atualizado com sucesso.',
+              )
+
+              form.reset()
+
+              router.refresh()
+            } else {
+              toast.error(
+                result.error ??
+                  'Não foi possível concluir a ação.',
+              )
+            }
+          } catch (error) {
+            console.error(error)
+
+            toast.error(
+              'Ocorreu um erro inesperado.',
+            )
+          }
+        })()
       })
     }
 
@@ -222,6 +226,7 @@ export function AdminDashboard({
           className="mt-4 space-y-4"
           onSubmit={(e) => {
             e.preventDefault()
+
             submit(createCodes)(
               e.currentTarget,
             )
@@ -236,6 +241,7 @@ export function AdminDashboard({
               id="codes"
               name="codes"
               required
+              disabled={isPending}
               className="mt-1 min-h-40 w-full rounded-md border bg-background p-3 font-mono text-sm"
               placeholder={`CODIGO-001
 CODIGO-002
@@ -290,32 +296,43 @@ CODIGO-004`}
             </thead>
 
             <tbody>
-              {customers.map((customer) => (
-                <tr
-                  key={customer.id}
-                  className="border-t"
-                >
-                  <td className="px-4 py-3">
-                    {customer.email ??
-                      customer.full_name ??
-                      customer.id}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {customer.codeCount}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {customer.orderCount}
-                  </td>
-
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {formatDate(
-                      customer.created_at,
-                    )}
+              {customers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-6 text-center text-muted-foreground"
+                  >
+                    Nenhum cliente encontrado.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                customers.map((customer) => (
+                  <tr
+                    key={customer.id}
+                    className="border-t"
+                  >
+                    <td className="px-4 py-3">
+                      {customer.email ??
+                        customer.full_name ??
+                        customer.id}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {customer.codeCount}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {customer.orderCount}
+                    </td>
+
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatDate(
+                        customer.created_at,
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
 
           </table>
@@ -347,206 +364,213 @@ CODIGO-004`}
 
         <div className="mt-3 space-y-3">
 
-          {codes.map((code) => {
-            const isAvailable =
-              code.status === 'active' &&
-              !code.user_id
+          {codes.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
+              Nenhum código no estoque.
+            </div>
+          ) : (
+            codes.map((code) => {
+              const isAvailable =
+                code.status === 'active' &&
+                !code.user_id
 
-            return (
-              <div
-                key={code.id}
-                className="rounded-xl border border-border/60 bg-card p-4"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              return (
+                <div
+                  key={code.id}
+                  className="rounded-xl border border-border/60 bg-card p-4"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-                  {/* INFORMAÇÕES */}
+                    {/* INFORMAÇÕES */}
 
-                  <div className="min-w-0">
+                    <div className="min-w-0">
 
-                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
 
-                      <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
-                        {code.code}
-                      </code>
+                        <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
+                          {code.code}
+                        </code>
 
-                      <StatusBadge
-                        status={code.status}
-                        type="code"
-                      />
+                        <StatusBadge
+                          status={code.status}
+                          type="code"
+                        />
 
-                      {isAvailable && (
-                        <span className="text-xs font-medium text-green-500">
-                          Disponível
-                        </span>
-                      )}
+                        {isAvailable && (
+                          <span className="text-xs font-medium text-green-500">
+                            Disponível
+                          </span>
+                        )}
+
+                      </div>
+
+                      <p className="mt-2 text-xs text-muted-foreground">
+
+                        {code.userEmail
+                          ? `Entregue para: ${code.userEmail}`
+                          : 'Disponível no estoque'}
+
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Adicionado em{' '}
+                        {formatDate(
+                          code.created_at,
+                        )}
+
+                        {code.assigned_at && (
+                          <>
+                            {' · '}
+                            Entregue em{' '}
+                            {formatDate(
+                              code.assigned_at,
+                            )}
+                          </>
+                        )}
+                      </p>
 
                     </div>
 
-                    <p className="mt-2 text-xs text-muted-foreground">
+                    {/* AÇÕES */}
 
-                      {code.userEmail
-                        ? `Entregue para: ${code.userEmail}`
-                        : 'Disponível no estoque'}
+                    <div className="flex flex-wrap gap-2">
 
-                    </p>
+                      {/* ATRIBUIR */}
 
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Adicionado em{' '}
-                      {formatDate(
-                        code.created_at,
-                      )}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
 
-                      {code.assigned_at && (
-                        <>
-                          {' · '}
-                          Entregue em{' '}
-                          {formatDate(
-                            code.assigned_at,
-                          )}
-                        </>
-                      )}
-                    </p>
-
-                  </div>
-
-                  {/* AÇÕES */}
-
-                  <div className="flex flex-wrap gap-2">
-
-                    {/* ATRIBUIR */}
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-
-                        submit(assignCode)(
-                          e.currentTarget,
-                        )
-                      }}
-                    >
-
-                      <input
-                        type="hidden"
-                        name="codeId"
-                        value={code.id}
-                      />
-
-                      <select
-                        name="userId"
-                        defaultValue={
-                          code.user_id ?? ''
-                        }
-                        className="h-9 rounded-md border bg-background px-2 text-sm"
-                      >
-                        <option value="">
-                          Não atribuído
-                        </option>
-
-                        {customerOptions.map(
-                          (user) => (
-                            <option
-                              key={user.id}
-                              value={user.id}
-                            >
-                              {user.label}
-                            </option>
-                          ),
-                        )}
-                      </select>
-
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="secondary"
-                        disabled={isPending}
-                        className="ml-2"
-                      >
-                        Salvar
-                      </Button>
-
-                    </form>
-
-                    {/* ATIVAR / DESATIVAR */}
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-
-                        submit(setCodeStatus)(
-                          e.currentTarget,
-                        )
-                      }}
-                    >
-
-                      <input
-                        type="hidden"
-                        name="codeId"
-                        value={code.id}
-                      />
-
-                      <input
-                        type="hidden"
-                        name="status"
-                        value={
-                          code.status === 'active'
-                            ? 'inactive'
-                            : 'active'
-                        }
-                      />
-
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="outline"
-                        disabled={isPending}
-                      >
-                        {code.status === 'active'
-                          ? 'Desativar'
-                          : 'Ativar'}
-                      </Button>
-
-                    </form>
-
-                    {/* EXCLUIR */}
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-
-                        if (
-                          confirm(
-                            'Excluir este código?',
-                          )
-                        ) {
-                          submit(deleteCode)(
+                          submit(assignCode)(
                             e.currentTarget,
                           )
-                        }
-                      }}
-                    >
-
-                      <input
-                        type="hidden"
-                        name="codeId"
-                        value={code.id}
-                      />
-
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="destructive"
-                        disabled={isPending}
+                        }}
                       >
-                        Excluir
-                      </Button>
 
-                    </form>
+                        <input
+                          type="hidden"
+                          name="codeId"
+                          value={code.id}
+                        />
 
+                        <select
+                          name="userId"
+                          defaultValue={
+                            code.user_id ?? ''
+                          }
+                          disabled={isPending}
+                          className="h-9 rounded-md border bg-background px-2 text-sm"
+                        >
+                          <option value="">
+                            Não atribuído
+                          </option>
+
+                          {customerOptions.map(
+                            (user) => (
+                              <option
+                                key={user.id}
+                                value={user.id}
+                              >
+                                {user.label}
+                              </option>
+                            ),
+                          )}
+                        </select>
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="secondary"
+                          disabled={isPending}
+                          className="ml-2"
+                        >
+                          Salvar
+                        </Button>
+
+                      </form>
+
+                      {/* ATIVAR / DESATIVAR */}
+
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+
+                          submit(setCodeStatus)(
+                            e.currentTarget,
+                          )
+                        }}
+                      >
+
+                        <input
+                          type="hidden"
+                          name="codeId"
+                          value={code.id}
+                        />
+
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={
+                            code.status === 'active'
+                              ? 'inactive'
+                              : 'active'
+                          }
+                        />
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                        >
+                          {code.status === 'active'
+                            ? 'Desativar'
+                            : 'Ativar'}
+                        </Button>
+
+                      </form>
+
+                      {/* EXCLUIR */}
+
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+
+                          if (
+                            confirm(
+                              'Excluir este código?',
+                            )
+                          ) {
+                            submit(deleteCode)(
+                              e.currentTarget,
+                            )
+                          }
+                        }}
+                      >
+
+                        <input
+                          type="hidden"
+                          name="codeId"
+                          value={code.id}
+                        />
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="destructive"
+                          disabled={isPending}
+                        >
+                          Excluir
+                        </Button>
+
+                      </form>
+
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })
+          )}
 
         </div>
       </section>
@@ -590,88 +614,100 @@ CODIGO-004`}
 
             <tbody>
 
-              {orders.map((order) => (
-                <tr
-                  key={order.id}
-                  className="border-t"
-                >
-
-                  <td className="px-4 py-3">
-                    {order.productName ??
-                      'Plano'}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {order.userEmail ?? '—'}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {formatBRL(
-                      order.total_cents,
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {formatDate(
-                      order.created_at,
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3">
-
-                    <form
-                      className="flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault()
-
-                        submit(setOrderStatus)(
-                          e.currentTarget,
-                        )
-                      }}
-                    >
-
-                      <input
-                        type="hidden"
-                        name="orderId"
-                        value={order.id}
-                      />
-
-                      <select
-                        name="status"
-                        defaultValue={
-                          order.status
-                        }
-                        className="h-9 rounded-md border bg-background px-2 text-sm"
-                      >
-                        {[
-                          'pending',
-                          'paid',
-                          'delivered',
-                          'cancelled',
-                        ].map((status) => (
-                          <option
-                            key={status}
-                            value={status}
-                          >
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="secondary"
-                        disabled={isPending}
-                      >
-                        Salvar
-                      </Button>
-
-                    </form>
-
+              {orders.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-muted-foreground"
+                  >
+                    Nenhum pedido encontrado.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                orders.map((order) => (
+                  <tr
+                    key={order.id}
+                    className="border-t"
+                  >
+
+                    <td className="px-4 py-3">
+                      {order.productName ??
+                        'Plano'}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {order.userEmail ?? '—'}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {formatBRL(
+                        order.total_cents,
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {formatDate(
+                        order.created_at,
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3">
+
+                      <form
+                        className="flex gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+
+                          submit(setOrderStatus)(
+                            e.currentTarget,
+                          )
+                        }}
+                      >
+
+                        <input
+                          type="hidden"
+                          name="orderId"
+                          value={order.id}
+                        />
+
+                        <select
+                          name="status"
+                          defaultValue={
+                            order.status
+                          }
+                          disabled={isPending}
+                          className="h-9 rounded-md border bg-background px-2 text-sm"
+                        >
+                          {[
+                            'pending',
+                            'paid',
+                            'delivered',
+                            'cancelled',
+                          ].map((status) => (
+                            <option
+                              key={status}
+                              value={status}
+                            >
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="secondary"
+                          disabled={isPending}
+                        >
+                          Salvar
+                        </Button>
+
+                      </form>
+
+                    </td>
+                  </tr>
+                ))
+              )}
 
             </tbody>
 
