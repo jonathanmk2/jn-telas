@@ -85,43 +85,46 @@ export function AdminDashboard({
   const [isPending, startTransition] =
     useTransition()
 
-  function handleAction(
+  function executeAction(
     action: (
       formData: FormData,
     ) => Promise<ActionResult>,
     formData: FormData,
     form?: HTMLFormElement,
   ) {
-    startTransition(() => {
-      void action(formData)
-        .then((result) => {
-          if (result.ok) {
-            toast.success(
-              result.message ??
-                'Ação realizada com sucesso.',
-            )
+    startTransition(async () => {
+      try {
+        const result = await action(formData)
 
-            form?.reset()
-
-            router.refresh()
-            return
-          }
-
+        if (!result.ok) {
           toast.error(
-            result.error ??
+            result.error ||
               'Não foi possível concluir a ação.',
           )
-        })
-        .catch((error) => {
-          console.error(
-            'Erro na ação administrativa:',
-            error,
-          )
 
-          toast.error(
-            'Ocorreu um erro inesperado.',
-          )
-        })
+          return
+        }
+
+        toast.success(
+          result.message ||
+            'Ação realizada com sucesso.',
+        )
+
+        if (form) {
+          form.reset()
+        }
+
+        router.refresh()
+      } catch (error) {
+        console.error(
+          'Erro na ação administrativa:',
+          error,
+        )
+
+        toast.error(
+          'Ocorreu um erro inesperado.',
+        )
+      }
     })
   }
 
@@ -154,7 +157,9 @@ export function AdminDashboard({
   return (
     <div className="space-y-10">
 
-      {/* RESUMO */}
+      {/* ========================================= */}
+      {/* RESUMO DO ESTOQUE */}
+      {/* ========================================= */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -206,7 +211,9 @@ export function AdminDashboard({
         </div>
       </section>
 
+      {/* ========================================= */}
       {/* ADICIONAR CÓDIGOS */}
+      {/* ========================================= */}
 
       <section className="rounded-xl border border-border/60 bg-card p-5">
         <h2 className="text-lg font-semibold">
@@ -215,7 +222,7 @@ export function AdminDashboard({
 
         <p className="mt-1 text-sm text-muted-foreground">
           Todos os códigos entram no mesmo estoque geral.
-          Um por linha.
+          Cole um código por linha.
         </p>
 
         <form
@@ -226,7 +233,7 @@ export function AdminDashboard({
             const form = e.currentTarget
             const formData = new FormData(form)
 
-            handleAction(
+            executeAction(
               createCodes,
               formData,
               form,
@@ -263,7 +270,9 @@ CODIGO-003`}
         </form>
       </section>
 
+      {/* ========================================= */}
       {/* CLIENTES */}
+      {/* ========================================= */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -326,7 +335,9 @@ CODIGO-003`}
         </div>
       </section>
 
+      {/* ========================================= */}
       {/* ESTOQUE */}
+      {/* ========================================= */}
 
       <section>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -423,10 +434,9 @@ CODIGO-003`}
                           const form =
                             e.currentTarget
 
-                          handleAction(
+                          executeAction(
                             assignCode,
                             new FormData(form),
-                            form,
                           )
                         }}
                       >
@@ -471,7 +481,7 @@ CODIGO-003`}
                         </Button>
                       </form>
 
-                      {/* STATUS */}
+                      {/* ATIVAR / DESATIVAR */}
 
                       <form
                         onSubmit={(e) => {
@@ -480,10 +490,9 @@ CODIGO-003`}
                           const form =
                             e.currentTarget
 
-                          handleAction(
+                          executeAction(
                             setCodeStatus,
                             new FormData(form),
-                            form,
                           )
                         }}
                       >
@@ -523,12 +532,11 @@ CODIGO-003`}
                         variant="destructive"
                         disabled={isPending}
                         onClick={() => {
-                          const confirmed =
-                            window.confirm(
+                          if (
+                            !window.confirm(
                               `Excluir o código ${code.code}?`,
                             )
-
-                          if (!confirmed) {
+                          ) {
                             return
                           }
 
@@ -540,7 +548,7 @@ CODIGO-003`}
                             code.id,
                           )
 
-                          handleAction(
+                          executeAction(
                             deleteCode,
                             formData,
                           )
@@ -559,7 +567,9 @@ CODIGO-003`}
         </div>
       </section>
 
+      {/* ========================================= */}
       {/* PEDIDOS */}
+      {/* ========================================= */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -633,10 +643,9 @@ CODIGO-003`}
                         const form =
                           e.currentTarget
 
-                        handleAction(
+                        executeAction(
                           setOrderStatus,
                           new FormData(form),
-                          form,
                         )
                       }}
                     >
