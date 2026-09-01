@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
         notificationId = String(body.data.id)
       }
     } catch {
-      console.log('Webhook sem JSON no body.')
+      console.log(
+        'Webhook sem JSON no body.',
+      )
     }
 
     console.log('Tipo recebido:', type)
@@ -286,8 +288,6 @@ export async function POST(request: NextRequest) {
     console.error(error)
     console.error('=================================')
 
-    // Sempre responde 200 para evitar
-    // reenvios infinitos do webhook
     return NextResponse.json({
       ok: true,
     })
@@ -374,10 +374,6 @@ async function processPayment({
 
     // =====================================================
     // DESCOBRE QUANTOS CÓDIGOS ENTREGAR
-    //
-    // 1 tela  = 1 código
-    // 5 telas = 5 códigos
-    // 10 telas = 10 códigos
     // =====================================================
 
     const product = Array.isArray(order.products)
@@ -469,8 +465,7 @@ async function processPayment({
       // IMPORTANTE:
       // NÃO FILTRA product_id.
       //
-      // TODOS OS CÓDIGOS PERTENCEM
-      // AO MESMO ESTOQUE.
+      // TODOS OS PRODUTOS USAM O MESMO ESTOQUE.
       // ===================================================
 
       console.log('=================================')
@@ -530,7 +525,7 @@ async function processPayment({
         )
         console.error('=================================')
 
-        // Pedido continua como PAID.
+        // Pedido permanece PAID.
         // Não marca como DELIVERED.
         return
       }
@@ -548,7 +543,14 @@ async function processPayment({
         new Date().toISOString()
 
       // ===================================================
-      // ATRIBUI TODOS OS CÓDIGOS AO USUÁRIO
+      // ATRIBUI OS CÓDIGOS
+      //
+      // IMPORTANTE:
+      //
+      // user_id  = dono dos códigos
+      // order_id = pedido específico
+      //
+      // Isso permite separar os códigos por compra.
       // ===================================================
 
       const {
@@ -558,6 +560,7 @@ async function processPayment({
         .from('activation_codes')
         .update({
           user_id: order.user_id,
+          order_id: order.id,
           assigned_at: assignedAt,
         })
         .in('id', codeIds)
@@ -602,24 +605,25 @@ async function processPayment({
 
       console.log('=================================')
       console.log(
-        `${deliveredCodes.length} CÓDIGO(S) ATRIBUÍDO(S) AO USUÁRIO!`,
+        `${deliveredCodes.length} CÓDIGO(S) ATRIBUÍDO(S) AO PEDIDO!`,
       )
-      console.log('Códigos entregues:')
+
       console.log(
+        'Pedido:',
+        order.id,
+      )
+
+      console.log(
+        'Códigos:',
         deliveredCodes.map(
           (code) => code.code,
         ),
       )
+
       console.log('=================================')
 
       // ===================================================
       // MARCA PEDIDO COMO ENTREGUE
-      //
-      // activation_code_id guarda apenas o primeiro código
-      // por compatibilidade com sua tabela atual.
-      //
-      // TODOS os códigos estão vinculados ao usuário
-      // através de activation_codes.user_id.
       // ===================================================
 
       const {
@@ -644,11 +648,14 @@ async function processPayment({
 
       console.log('=================================')
       console.log(
-        'CÓDIGOS ENTREGUES AO USUÁRIO COM SUCESSO!',
+        'PEDIDO ENTREGUE COM SUCESSO!',
       )
-      console.log('Pedido:', order.id)
       console.log(
-        'Quantidade entregue:',
+        'Pedido:',
+        order.id,
+      )
+      console.log(
+        'Quantidade:',
         deliveredCodes.length,
       )
       console.log('=================================')
