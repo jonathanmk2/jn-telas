@@ -1,8 +1,14 @@
 'use client'
 
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
-import { Check, Copy, Loader2, X } from 'lucide-react'
+import {
+  Check,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  X,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
@@ -23,6 +29,13 @@ type PaymentData = {
   qrCode: string | null
   qrCodeBase64: string | null
 }
+
+type OrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'delivered'
+  | 'cancelled'
+  | 'unknown'
 
 const featuresByScreens: Record<number, string[]> = {
   1: [
@@ -56,9 +69,17 @@ export function Pricing({
 
   const [pending, startTransition] = useTransition()
 
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] =
+    useState<string | null>(null)
 
-  const [payment, setPayment] = useState<PaymentData | null>(null)
+  const [payment, setPayment] =
+    useState<PaymentData | null>(null)
+
+  const [orderStatus, setOrderStatus] =
+    useState<OrderStatus>('pending')
+
+  const [checkingPayment, setCheckingPayment] =
+    useState(false)
 
   function handleBuy(product: Product) {
     if (!isLoggedIn) {
@@ -81,16 +102,26 @@ export function Pricing({
             qrCodeBase64: res.qrCodeBase64,
           })
 
-          toast.success('Pagamento PIX gerado com sucesso!')
+          setOrderStatus('pending')
+
+          toast.success(
+            'Pagamento PIX gerado com sucesso!',
+          )
         } else if (res.needsAuth) {
           router.push('/auth/login?next=/minha-conta')
         } else {
-          console.error('Erro no pagamento:', res.error)
+          console.error(
+            'Erro no pagamento:',
+            res.error,
+          )
 
           toast.error(res.error)
         }
       } catch (error) {
-        console.error('Erro inesperado:', error)
+        console.error(
+          'Erro inesperado:',
+          error,
+        )
 
         toast.error(
           'Ocorreu um erro inesperado ao gerar o pagamento.',
@@ -103,27 +134,133 @@ export function Pricing({
 
   async function copyPixCode() {
     if (!payment?.qrCode) {
-      toast.error('Código PIX não disponível.')
+      toast.error(
+        'Código PIX não disponível.',
+      )
+
       return
     }
 
     try {
-      await navigator.clipboard.writeText(payment.qrCode)
+      await navigator.clipboard.writeText(
+        payment.qrCode,
+      )
 
       toast.success('Código PIX copiado!')
     } catch {
-      toast.error('Não foi possível copiar o código PIX.')
+      toast.error(
+        'Não foi possível copiar o código PIX.',
+      )
     }
   }
+
+  // ============================================
+  // VERIFICA STATUS DO PAGAMENTO
+  // ============================================
+
+  useEffect(() => {
+    if (!payment?.orderId) {
+      return
+    }
+
+    if (
+      orderStatus === 'paid' ||
+      orderStatus === 'delivered' ||
+      orderStatus === 'cancelled'
+    ) {
+      return
+    }
+
+    let active = true
+
+    async function checkPayment() {
+      try {
+        setCheckingPayment(true)
+
+        const response = await fetch(
+          `/api/orders/${payment.orderId}/status`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        )
+
+        if (!response.ok) {
+          return
+        }
+
+        const data = await response.json()
+
+        if (!active) {
+          return
+        }
+
+        console.log(
+          'Status do pedido:',
+          data.status,
+        )
+
+        const newStatus =
+          data.status as OrderStatus
+
+        setOrderStatus(newStatus)
+
+        if (
+          newStatus === 'paid' ||
+          newStatus === 'delivered'
+        ) {
+          toast.success(
+            'Pagamento confirmado com sucesso!',
+          )
+        }
+
+        if (newStatus === 'cancelled') {
+          toast.error(
+            'Este pagamento foi cancelado.',
+          )
+        }
+      } catch (error) {
+        console.error(
+          'Erro ao verificar pagamento:',
+          error,
+        )
+      } finally {
+        if (active) {
+          setCheckingPayment(false)
+        }
+      }
+    }
+
+    // Verifica imediatamente
+    checkPayment()
+
+    // Depois verifica automaticamente
+    // a cada 3 segundos
+    const interval = setInterval(
+      checkPayment,
+      3000,
+    )
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [payment?.orderId, orderStatus])
 
   const highlighted = 5
 
   const qrImage =
     payment?.qrCodeBase64
-      ? payment.qrCodeBase64.startsWith('data:image')
+      ? payment.qrCodeBase64.startsWith(
+          'data:image',
+        )
         ? payment.qrCodeBase64
         : `data:image/png;base64,${payment.qrCodeBase64}`
       : null
+
+  const paymentConfirmed =
+    orderStatus === 'paid' ||
+    orderStatus === 'delivered'
 
   return (
     <>
@@ -148,10 +285,13 @@ export function Pricing({
                 product.screens === highlighted
 
               const features =
-                featuresByScreens[product.screens] ?? []
+                featuresByScreens[
+                  product.screens
+                ] ?? []
 
               const loading =
-                pending && activeId === product.id
+                pending &&
+                activeId === product.id
 
               return (
                 <div
@@ -180,7 +320,9 @@ export function Pricing({
 
                   <div className="mt-5 flex items-end gap-1">
                     <span className="text-4xl font-bold tracking-tight">
-                      {formatBRL(product.price_cents)}
+                      {formatBRL(
+                        product.price_cents,
+                      )}
                     </span>
 
                     <span className="mb-1 text-sm text-muted-foreground">
@@ -189,18 +331,20 @@ export function Pricing({
                   </div>
 
                   <ul className="mt-6 flex flex-1 flex-col gap-3">
-                    {features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-start gap-2 text-sm"
-                      >
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                    {features.map(
+                      (feature) => (
+                        <li
+                          key={feature}
+                          className="flex items-start gap-2 text-sm"
+                        >
+                          <Check className="mt-0.5 size-4 shrink-0 text-primary" />
 
-                        <span className="text-muted-foreground">
-                          {feature}
-                        </span>
-                      </li>
-                    ))}
+                          <span className="text-muted-foreground">
+                            {feature}
+                          </span>
+                        </li>
+                      ),
+                    )}
                   </ul>
 
                   <Button
@@ -210,7 +354,9 @@ export function Pricing({
                         ? 'default'
                         : 'secondary'
                     }
-                    onClick={() => handleBuy(product)}
+                    onClick={() =>
+                      handleBuy(product)
+                    }
                     disabled={loading}
                   >
                     {loading ? (
@@ -234,66 +380,168 @@ export function Pricing({
           <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
             <button
               type="button"
-              onClick={() => setPayment(null)}
+              onClick={() => {
+                setPayment(null)
+                setOrderStatus('pending')
+              }}
               className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Fechar"
             >
               <X className="size-5" />
             </button>
 
-            <div className="text-center">
-              <h2 className="text-2xl font-bold">
-                Pague com PIX
-              </h2>
+            {/* ================================= */}
+            {/* PAGAMENTO CONFIRMADO */}
+            {/* ================================= */}
 
-              <p className="mt-2 text-sm text-muted-foreground">
-                Escaneie o QR Code ou copie o código PIX.
-              </p>
-
-              {qrImage ? (
-                <div className="mt-6 flex justify-center">
-                  <div className="rounded-xl bg-white p-3">
-                    <img
-                      src={qrImage}
-                      alt="QR Code PIX"
-                      className="h-56 w-56"
-                    />
-                  </div>
+            {paymentConfirmed ? (
+              <div className="py-6 text-center">
+                <div className="flex justify-center">
+                  <CheckCircle2 className="size-20 text-green-500" />
                 </div>
-              ) : (
-                <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
-                  O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
-                </div>
-              )}
 
-              {payment.qrCode && (
-                <>
-                  <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
-                    {payment.qrCode}
+                <h2 className="mt-5 text-2xl font-bold">
+                  Pagamento confirmado!
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Seu pagamento foi aprovado com
+                  sucesso.
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Seus códigos já foram adicionados
+                  à sua conta.
+                </p>
+
+                <Button
+                  className="mt-8 w-full"
+                  onClick={() => {
+                    router.push('/minha-conta')
+                    setPayment(null)
+                  }}
+                >
+                  Ver meus códigos
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    setPayment(null)
+                  }}
+                >
+                  Fechar
+                </Button>
+              </div>
+            ) : orderStatus === 'cancelled' ? (
+              /* ================================= */
+              /* PAGAMENTO CANCELADO */
+              /* ================================= */
+
+              <div className="py-6 text-center">
+                <h2 className="text-2xl font-bold">
+                  Pagamento cancelado
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Este pagamento não foi aprovado.
+                </p>
+
+                <Button
+                  variant="outline"
+                  className="mt-8 w-full"
+                  onClick={() =>
+                    setPayment(null)
+                  }
+                >
+                  Fechar
+                </Button>
+              </div>
+            ) : (
+              /* ================================= */
+              /* AGUARDANDO PAGAMENTO */
+              /* ================================= */
+
+              <div className="text-center">
+                <h2 className="text-2xl font-bold">
+                  Pague com PIX
+                </h2>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Escaneie o QR Code ou copie o
+                  código PIX.
+                </p>
+
+                {qrImage ? (
+                  <div className="mt-6 flex justify-center">
+                    <div className="rounded-xl bg-white p-3">
+                      <img
+                        src={qrImage}
+                        alt="QR Code PIX"
+                        className="h-56 w-56"
+                      />
+                    </div>
                   </div>
+                ) : (
+                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                    O pagamento foi criado, mas o
+                    QR Code não foi encontrado na
+                    resposta.
+                  </div>
+                )}
 
-                  <Button
-                    className="mt-4 w-full"
-                    onClick={copyPixCode}
-                  >
-                    <Copy className="size-4" />
-                    Copiar código PIX
-                  </Button>
-                </>
-              )}
+                {payment.qrCode && (
+                  <>
+                    <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+                      {payment.qrCode}
+                    </div>
 
-              <p className="mt-5 text-xs text-muted-foreground">
-                Pedido: {payment.orderId}
-              </p>
+                    <Button
+                      className="mt-4 w-full"
+                      onClick={copyPixCode}
+                    >
+                      <Copy className="size-4" />
+                      Copiar código PIX
+                    </Button>
+                  </>
+                )}
 
-              <Button
-                variant="outline"
-                className="mt-4 w-full"
-                onClick={() => setPayment(null)}
-              >
-                Fechar
-              </Button>
-            </div>
+                {/* STATUS AUTOMÁTICO */}
+
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  {checkingPayment ? (
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                  ) : (
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                  )}
+
+                  <span>
+                    Aguardando confirmação do
+                    pagamento...
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Esta página verifica
+                  automaticamente seu pagamento.
+                </p>
+
+                <p className="mt-5 text-xs text-muted-foreground">
+                  Pedido: {payment.orderId}
+                </p>
+
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() =>
+                    setPayment(null)
+                  }
+                >
+                  Fechar
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
