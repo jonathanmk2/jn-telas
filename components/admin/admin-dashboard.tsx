@@ -57,17 +57,21 @@ type CustomerOption = {
   label: string
 }
 
-type ActionResult = {
-  ok: boolean
-  message?: string
-  error?: string
-}
+type ActionResult =
+  | {
+      ok: true
+      message?: string
+    }
+  | {
+      ok: false
+      error: string
+    }
 
 export function AdminDashboard({
   customers,
   codes,
   orders,
-  productOptions,
+  productOptions: _productOptions,
   customerOptions,
 }: {
   customers: Customer[]
@@ -81,49 +85,45 @@ export function AdminDashboard({
   const [isPending, startTransition] =
     useTransition()
 
-  const submit =
-    (
-      action: (
-        fd: FormData,
-      ) => Promise<ActionResult>,
-    ) =>
-    (form: HTMLFormElement) => {
-      const fd = new FormData(form)
-
-      startTransition(() => {
-        void (async () => {
-          try {
-            const result = await action(fd)
-
-            if (result.ok) {
-              toast.success(
-                result.message ??
-                  'Atualizado com sucesso.',
-              )
-
-              form.reset()
-
-              router.refresh()
-            } else {
-              toast.error(
-                result.error ??
-                  'Não foi possível concluir a ação.',
-              )
-            }
-          } catch (error) {
-            console.error(error)
-
-            toast.error(
-              'Ocorreu um erro inesperado.',
+  function handleAction(
+    action: (
+      formData: FormData,
+    ) => Promise<ActionResult>,
+    formData: FormData,
+    form?: HTMLFormElement,
+  ) {
+    startTransition(() => {
+      void action(formData)
+        .then((result) => {
+          if (result.ok) {
+            toast.success(
+              result.message ??
+                'Ação realizada com sucesso.',
             )
-          }
-        })()
-      })
-    }
 
-  // ============================================
-  // ESTATÍSTICAS DO ESTOQUE
-  // ============================================
+            form?.reset()
+
+            router.refresh()
+            return
+          }
+
+          toast.error(
+            result.error ??
+              'Não foi possível concluir a ação.',
+          )
+        })
+        .catch((error) => {
+          console.error(
+            'Erro na ação administrativa:',
+            error,
+          )
+
+          toast.error(
+            'Ocorreu um erro inesperado.',
+          )
+        })
+    })
+  }
 
   const stats = useMemo(() => {
     const total = codes.length
@@ -154,9 +154,7 @@ export function AdminDashboard({
   return (
     <div className="space-y-10">
 
-      {/* ======================================== */}
-      {/* RESUMO DO ESTOQUE */}
-      {/* ======================================== */}
+      {/* RESUMO */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -208,9 +206,7 @@ export function AdminDashboard({
         </div>
       </section>
 
-      {/* ======================================== */}
       {/* ADICIONAR CÓDIGOS */}
-      {/* ======================================== */}
 
       <section className="rounded-xl border border-border/60 bg-card p-5">
         <h2 className="text-lg font-semibold">
@@ -227,8 +223,13 @@ export function AdminDashboard({
           onSubmit={(e) => {
             e.preventDefault()
 
-            submit(createCodes)(
-              e.currentTarget,
+            const form = e.currentTarget
+            const formData = new FormData(form)
+
+            handleAction(
+              createCodes,
+              formData,
+              form,
             )
           }}
         >
@@ -245,8 +246,7 @@ export function AdminDashboard({
               className="mt-1 min-h-40 w-full rounded-md border bg-background p-3 font-mono text-sm"
               placeholder={`CODIGO-001
 CODIGO-002
-CODIGO-003
-CODIGO-004`}
+CODIGO-003`}
             />
           </div>
 
@@ -263,9 +263,7 @@ CODIGO-004`}
         </form>
       </section>
 
-      {/* ======================================== */}
       {/* CLIENTES */}
-      {/* ======================================== */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -296,52 +294,39 @@ CODIGO-004`}
             </thead>
 
             <tbody>
-              {customers.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-6 text-center text-muted-foreground"
-                  >
-                    Nenhum cliente encontrado.
+              {customers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  className="border-t"
+                >
+                  <td className="px-4 py-3">
+                    {customer.email ??
+                      customer.full_name ??
+                      customer.id}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {customer.codeCount}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {customer.orderCount}
+                  </td>
+
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(
+                      customer.created_at,
+                    )}
                   </td>
                 </tr>
-              ) : (
-                customers.map((customer) => (
-                  <tr
-                    key={customer.id}
-                    className="border-t"
-                  >
-                    <td className="px-4 py-3">
-                      {customer.email ??
-                        customer.full_name ??
-                        customer.id}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {customer.codeCount}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {customer.orderCount}
-                    </td>
-
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatDate(
-                        customer.created_at,
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
 
           </table>
         </div>
       </section>
 
-      {/* ======================================== */}
-      {/* ESTOQUE DE CÓDIGOS */}
-      {/* ======================================== */}
+      {/* ESTOQUE */}
 
       <section>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -381,8 +366,6 @@ CODIGO-004`}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-                    {/* INFORMAÇÕES */}
-
                     <div className="min-w-0">
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -405,11 +388,9 @@ CODIGO-004`}
                       </div>
 
                       <p className="mt-2 text-xs text-muted-foreground">
-
                         {code.userEmail
                           ? `Entregue para: ${code.userEmail}`
                           : 'Disponível no estoque'}
-
                       </p>
 
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -431,8 +412,6 @@ CODIGO-004`}
 
                     </div>
 
-                    {/* AÇÕES */}
-
                     <div className="flex flex-wrap gap-2">
 
                       {/* ATRIBUIR */}
@@ -441,12 +420,16 @@ CODIGO-004`}
                         onSubmit={(e) => {
                           e.preventDefault()
 
-                          submit(assignCode)(
-                            e.currentTarget,
+                          const form =
+                            e.currentTarget
+
+                          handleAction(
+                            assignCode,
+                            new FormData(form),
+                            form,
                           )
                         }}
                       >
-
                         <input
                           type="hidden"
                           name="codeId"
@@ -486,21 +469,24 @@ CODIGO-004`}
                         >
                           Salvar
                         </Button>
-
                       </form>
 
-                      {/* ATIVAR / DESATIVAR */}
+                      {/* STATUS */}
 
                       <form
                         onSubmit={(e) => {
                           e.preventDefault()
 
-                          submit(setCodeStatus)(
-                            e.currentTarget,
+                          const form =
+                            e.currentTarget
+
+                          handleAction(
+                            setCodeStatus,
+                            new FormData(form),
+                            form,
                           )
                         }}
                       >
-
                         <input
                           type="hidden"
                           name="codeId"
@@ -527,43 +513,41 @@ CODIGO-004`}
                             ? 'Desativar'
                             : 'Ativar'}
                         </Button>
-
                       </form>
 
                       {/* EXCLUIR */}
 
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault()
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={isPending}
+                        onClick={() => {
+                          const confirmed =
+                            window.confirm(
+                              `Excluir o código ${code.code}?`,
+                            )
 
-                          if (
-                            confirm(
-                              'Excluir este código?',
-                            )
-                          ) {
-                            submit(deleteCode)(
-                              e.currentTarget,
-                            )
+                          if (!confirmed) {
+                            return
                           }
+
+                          const formData =
+                            new FormData()
+
+                          formData.append(
+                            'codeId',
+                            code.id,
+                          )
+
+                          handleAction(
+                            deleteCode,
+                            formData,
+                          )
                         }}
                       >
-
-                        <input
-                          type="hidden"
-                          name="codeId"
-                          value={code.id}
-                        />
-
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="destructive"
-                          disabled={isPending}
-                        >
-                          Excluir
-                        </Button>
-
-                      </form>
+                        Excluir
+                      </Button>
 
                     </div>
                   </div>
@@ -575,9 +559,7 @@ CODIGO-004`}
         </div>
       </section>
 
-      {/* ======================================== */}
       {/* PEDIDOS */}
-      {/* ======================================== */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -614,100 +596,94 @@ CODIGO-004`}
 
             <tbody>
 
-              {orders.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-muted-foreground"
-                  >
-                    Nenhum pedido encontrado.
+              {orders.map((order) => (
+                <tr
+                  key={order.id}
+                  className="border-t"
+                >
+
+                  <td className="px-4 py-3">
+                    {order.productName ??
+                      'Plano'}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {order.userEmail ?? '—'}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {formatBRL(
+                      order.total_cents,
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {formatDate(
+                      order.created_at,
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3">
+
+                    <form
+                      className="flex gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+
+                        const form =
+                          e.currentTarget
+
+                        handleAction(
+                          setOrderStatus,
+                          new FormData(form),
+                          form,
+                        )
+                      }}
+                    >
+
+                      <input
+                        type="hidden"
+                        name="orderId"
+                        value={order.id}
+                      />
+
+                      <select
+                        name="status"
+                        defaultValue={
+                          order.status
+                        }
+                        disabled={isPending}
+                        className="h-9 rounded-md border bg-background px-2 text-sm"
+                      >
+                        {[
+                          'pending',
+                          'paid',
+                          'delivered',
+                          'cancelled',
+                        ].map((status) => (
+                          <option
+                            key={status}
+                            value={status}
+                          >
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={isPending}
+                      >
+                        Salvar
+                      </Button>
+
+                    </form>
+
                   </td>
                 </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr
-                    key={order.id}
-                    className="border-t"
-                  >
-
-                    <td className="px-4 py-3">
-                      {order.productName ??
-                        'Plano'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {order.userEmail ?? '—'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {formatBRL(
-                        order.total_cents,
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {formatDate(
-                        order.created_at,
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3">
-
-                      <form
-                        className="flex gap-2"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-
-                          submit(setOrderStatus)(
-                            e.currentTarget,
-                          )
-                        }}
-                      >
-
-                        <input
-                          type="hidden"
-                          name="orderId"
-                          value={order.id}
-                        />
-
-                        <select
-                          name="status"
-                          defaultValue={
-                            order.status
-                          }
-                          disabled={isPending}
-                          className="h-9 rounded-md border bg-background px-2 text-sm"
-                        >
-                          {[
-                            'pending',
-                            'paid',
-                            'delivered',
-                            'cancelled',
-                          ].map((status) => (
-                            <option
-                              key={status}
-                              value={status}
-                            >
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="secondary"
-                          disabled={isPending}
-                        >
-                          Salvar
-                        </Button>
-
-                      </form>
-
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
 
             </tbody>
 
