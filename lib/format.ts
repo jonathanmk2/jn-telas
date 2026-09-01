@@ -38,6 +38,10 @@ export function formatDateTime(
 
 export const WHATSAPP_NUMBER = '5585985373629'
 
-export function whatsappLink(message: string): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+export function whatsappLink(
+  message: string,
+): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    message,
+  )}`
 }
