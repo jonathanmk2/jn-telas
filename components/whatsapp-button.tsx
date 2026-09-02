@@ -37,18 +37,15 @@ export function WhatsAppButton() {
       aria-label="Falar no WhatsApp"
       className="
         fixed
-        bottom-5
-        right-5
+        bottom-4
+        right-4
         z-50
         flex
+        size-12
         items-center
         justify-center
-        gap-2
         rounded-full
         bg-[#25D366]
-        px-4
-        py-3
-        font-medium
         text-white
         shadow-lg
         shadow-[#25D366]/30
@@ -56,11 +53,15 @@ export function WhatsAppButton() {
         hover:scale-105
         sm:bottom-6
         sm:right-6
+        sm:size-auto
+        sm:gap-2
+        sm:px-4
+        sm:py-3
       "
     >
       <WhatsAppIcon className="size-6 sm:size-7" />
 
-      <span className="text-sm font-semibold sm:text-base">
+      <span className="hidden text-sm font-semibold sm:inline sm:text-base">
         WhatsApp
       </span>
     </a>
