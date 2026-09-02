@@ -37,6 +37,37 @@ function getUnitPriceCents(quantity: number): number {
   return 3500
 }
 
+/*
+ * VALIDAÇÃO RIGOROSA DA QUANTIDADE
+ *
+ * Aceita somente:
+ * - número inteiro
+ * - positivo
+ * - entre 1 e 500
+ *
+ * Rejeita:
+ * - notação científica (ex.: 5e2)
+ * - decimais (ex.: 1.5)
+ * - zero
+ * - negativos
+ * - Infinity
+ * - NaN
+ * - valores acima de 500
+ *
+ * A validação acontece no backend.
+ */
+function isValidQuantity(
+  quantity: unknown,
+): quantity is number {
+  return (
+    typeof quantity === 'number' &&
+    Number.isFinite(quantity) &&
+    Number.isInteger(quantity) &&
+    quantity >= 1 &&
+    quantity <= 500
+  )
+}
+
 export async function createOrder(
   productId: string,
   quantity: number = 1,
@@ -93,18 +124,14 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 3. VALIDA QUANTIDADE
+    // 3. VALIDA QUANTIDADE - BACKEND
     // =====================================================
 
-    if (
-      !Number.isInteger(quantity) ||
-      quantity < 1 ||
-      quantity > 500
-    ) {
+    if (!isValidQuantity(quantity)) {
       return {
         ok: false,
         error:
-          'A quantidade deve estar entre 1 e 500 telas.',
+          'Quantidade inválida. Informe um número inteiro entre 1 e 500.',
       }
     }
 
