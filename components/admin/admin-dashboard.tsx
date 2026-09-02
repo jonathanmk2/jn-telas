@@ -82,49 +82,44 @@ export function AdminDashboard({
 }) {
   const router = useRouter()
 
-  const [isPending, startTransition] =
-    useTransition()
+  const [isPending, startTransition] = useTransition()
 
-  function executeAction(
+  function handleAction(
     action: (
       formData: FormData,
     ) => Promise<ActionResult>,
     formData: FormData,
     form?: HTMLFormElement,
   ) {
-    startTransition(async () => {
-      try {
-        const result = await action(formData)
+    startTransition(() => {
+      void action(formData)
+        .then((result) => {
+          if (result.ok) {
+            toast.success(
+              result.message ??
+                'Ação realizada com sucesso.',
+            )
 
-        if (!result.ok) {
+            form?.reset()
+            router.refresh()
+            return
+          }
+
           toast.error(
-            result.error ||
+            result.error ??
               'Não foi possível concluir a ação.',
           )
+        })
+        .catch((error) => {
+          console.error(
+            'Erro na ação administrativa:',
+            error,
+          )
 
-          return
-        }
-
-        toast.success(
-          result.message ||
-            'Ação realizada com sucesso.',
-        )
-
-        if (form) {
-          form.reset()
-        }
-
-        router.refresh()
-      } catch (error) {
-        console.error(
-          'Erro na ação administrativa:',
-          error,
-        )
-
-        toast.error(
-          'Ocorreu um erro inesperado.',
-        )
-      }
+          toast.error(
+            'Ocorreu um erro inesperado.',
+          )
+        })
     })
   }
 
@@ -137,7 +132,7 @@ export function AdminDashboard({
         !code.user_id,
     ).length
 
-    const assigned = codes.filter(
+    const delivered = codes.filter(
       (code) => !!code.user_id,
     ).length
 
@@ -149,17 +144,35 @@ export function AdminDashboard({
     return {
       total,
       available,
-      assigned,
+      delivered,
       inactive,
     }
   }, [codes])
 
+  const availableCodes = useMemo(
+    () =>
+      codes.filter(
+        (code) =>
+          !code.user_id,
+      ),
+    [codes],
+  )
+
+  const deliveredCodes = useMemo(
+    () =>
+      codes.filter(
+        (code) =>
+          !!code.user_id,
+      ),
+    [codes],
+  )
+
   return (
     <div className="space-y-10">
 
-      {/* ========================================= */}
-      {/* RESUMO DO ESTOQUE */}
-      {/* ========================================= */}
+      {/* =====================================================
+          RESUMO DO ESTOQUE
+      ====================================================== */}
 
       <section>
         <h2 className="text-lg font-semibold">
@@ -190,11 +203,11 @@ export function AdminDashboard({
 
           <div className="rounded-xl border border-border/60 bg-card p-5">
             <p className="text-sm text-muted-foreground">
-              Já entregues
+              Entregues a clientes
             </p>
 
             <p className="mt-2 text-3xl font-bold">
-              {stats.assigned}
+              {stats.delivered}
             </p>
           </div>
 
@@ -211,11 +224,13 @@ export function AdminDashboard({
         </div>
       </section>
 
-      {/* ========================================= */}
-      {/* ADICIONAR CÓDIGOS */}
-      {/* ========================================= */}
+
+      {/* =====================================================
+          ADICIONAR CÓDIGOS
+      ====================================================== */}
 
       <section className="rounded-xl border border-border/60 bg-card p-5">
+
         <h2 className="text-lg font-semibold">
           Adicionar códigos ao estoque
         </h2>
@@ -233,7 +248,7 @@ export function AdminDashboard({
             const form = e.currentTarget
             const formData = new FormData(form)
 
-            executeAction(
+            handleAction(
               createCodes,
               formData,
               form,
@@ -268,22 +283,27 @@ CODIGO-003`}
             </Button>
           </div>
         </form>
+
       </section>
 
-      {/* ========================================= */}
-      {/* CLIENTES */}
-      {/* ========================================= */}
+
+      {/* =====================================================
+          CLIENTES
+      ====================================================== */}
 
       <section>
+
         <h2 className="text-lg font-semibold">
           Clientes ({customers.length})
         </h2>
 
         <div className="mt-3 overflow-x-auto rounded-xl border border-border/60">
+
           <table className="w-full text-sm">
 
             <thead className="bg-card text-left text-muted-foreground">
               <tr>
+
                 <th className="px-4 py-3">
                   Cliente
                 </th>
@@ -299,15 +319,18 @@ CODIGO-003`}
                 <th className="px-4 py-3">
                   Cadastro
                 </th>
+
               </tr>
             </thead>
 
             <tbody>
+
               {customers.map((customer) => (
                 <tr
                   key={customer.id}
                   className="border-t"
                 >
+
                   <td className="px-4 py-3">
                     {customer.email ??
                       customer.full_name ??
@@ -327,251 +350,402 @@ CODIGO-003`}
                       customer.created_at,
                     )}
                   </td>
+
                 </tr>
               ))}
+
             </tbody>
 
           </table>
+
         </div>
+
       </section>
 
-      {/* ========================================= */}
-      {/* ESTOQUE */}
-      {/* ========================================= */}
+
+      {/* =====================================================
+          CÓDIGOS DISPONÍVEIS
+      ====================================================== */}
 
       <section>
+
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
 
           <div>
+
             <h2 className="text-lg font-semibold">
-              Estoque de códigos ({codes.length})
+              Códigos disponíveis ({availableCodes.length})
             </h2>
 
             <p className="text-sm text-muted-foreground">
-              Estoque único utilizado para todos os planos.
+              Códigos que ainda estão no estoque e podem
+              ser entregues em novas compras.
             </p>
+
           </div>
 
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm font-medium text-green-500">
             {stats.available} disponíveis
           </div>
 
         </div>
 
+
         <div className="mt-3 space-y-3">
 
-          {codes.length === 0 ? (
+          {availableCodes.length === 0 ? (
+
             <div className="rounded-xl border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
-              Nenhum código no estoque.
+              Nenhum código disponível no estoque.
             </div>
+
           ) : (
-            codes.map((code) => {
-              const isAvailable =
-                code.status === 'active' &&
-                !code.user_id
 
-              return (
-                <div
-                  key={code.id}
-                  className="rounded-xl border border-border/60 bg-card p-4"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            availableCodes.map((code) => (
 
-                    <div className="min-w-0">
+              <div
+                key={code.id}
+                className="rounded-xl border border-border/60 bg-card p-4"
+              >
 
-                      <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-                        <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
-                          {code.code}
-                        </code>
+                  <div className="min-w-0">
 
-                        <StatusBadge
-                          status={code.status}
-                          type="code"
-                        />
+                    <div className="flex flex-wrap items-center gap-2">
 
-                        {isAvailable && (
-                          <span className="text-xs font-medium text-green-500">
-                            Disponível
-                          </span>
-                        )}
+                      <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
+                        {code.code}
+                      </code>
 
-                      </div>
+                      <StatusBadge
+                        status={code.status}
+                        type="code"
+                      />
 
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {code.userEmail
-                          ? `Entregue para: ${code.userEmail}`
-                          : 'Disponível no estoque'}
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Adicionado em{' '}
-                        {formatDate(
-                          code.created_at,
-                        )}
-
-                        {code.assigned_at && (
-                          <>
-                            {' · '}
-                            Entregue em{' '}
-                            {formatDate(
-                              code.assigned_at,
-                            )}
-                          </>
-                        )}
-                      </p>
+                      {code.status === 'active' && (
+                        <span className="text-xs font-medium text-green-500">
+                          Disponível
+                        </span>
+                      )}
 
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Disponível no estoque
+                    </p>
 
-                      {/* ATRIBUIR */}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Adicionado em{' '}
+                      {formatDate(
+                        code.created_at,
+                      )}
+                    </p>
 
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault()
+                  </div>
 
-                          const form =
-                            e.currentTarget
 
-                          executeAction(
-                            assignCode,
-                            new FormData(form),
-                          )
-                        }}
+                  <div className="flex flex-wrap gap-2">
+
+                    {/* ATRIBUIR MANUALMENTE */}
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+
+                        const form =
+                          e.currentTarget
+
+                        handleAction(
+                          assignCode,
+                          new FormData(form),
+                          form,
+                        )
+                      }}
+                    >
+
+                      <input
+                        type="hidden"
+                        name="codeId"
+                        value={code.id}
+                      />
+
+                      <select
+                        name="userId"
+                        defaultValue=""
+                        disabled={isPending}
+                        className="h-9 rounded-md border bg-background px-2 text-sm"
                       >
-                        <input
-                          type="hidden"
-                          name="codeId"
-                          value={code.id}
-                        />
 
-                        <select
-                          name="userId"
-                          defaultValue={
-                            code.user_id ?? ''
-                          }
-                          disabled={isPending}
-                          className="h-9 rounded-md border bg-background px-2 text-sm"
-                        >
-                          <option value="">
-                            Não atribuído
-                          </option>
+                        <option value="">
+                          Não atribuído
+                        </option>
 
-                          {customerOptions.map(
-                            (user) => (
-                              <option
-                                key={user.id}
-                                value={user.id}
-                              >
-                                {user.label}
-                              </option>
-                            ),
-                          )}
-                        </select>
+                        {customerOptions.map(
+                          (user) => (
+                            <option
+                              key={user.id}
+                              value={user.id}
+                            >
+                              {user.label}
+                            </option>
+                          ),
+                        )}
 
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="secondary"
-                          disabled={isPending}
-                          className="ml-2"
-                        >
-                          Salvar
-                        </Button>
-                      </form>
-
-                      {/* ATIVAR / DESATIVAR */}
-
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault()
-
-                          const form =
-                            e.currentTarget
-
-                          executeAction(
-                            setCodeStatus,
-                            new FormData(form),
-                          )
-                        }}
-                      >
-                        <input
-                          type="hidden"
-                          name="codeId"
-                          value={code.id}
-                        />
-
-                        <input
-                          type="hidden"
-                          name="status"
-                          value={
-                            code.status === 'active'
-                              ? 'inactive'
-                              : 'active'
-                          }
-                        />
-
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending}
-                        >
-                          {code.status === 'active'
-                            ? 'Desativar'
-                            : 'Ativar'}
-                        </Button>
-                      </form>
-
-                      {/* EXCLUIR */}
+                      </select>
 
                       <Button
-                        type="button"
+                        type="submit"
                         size="sm"
-                        variant="destructive"
+                        variant="secondary"
                         disabled={isPending}
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              `Excluir o código ${code.code}?`,
-                            )
-                          ) {
-                            return
-                          }
-
-                          const formData =
-                            new FormData()
-
-                          formData.append(
-                            'codeId',
-                            code.id,
-                          )
-
-                          executeAction(
-                            deleteCode,
-                            formData,
-                          )
-                        }}
+                        className="ml-2"
                       >
-                        Excluir
+                        Atribuir
                       </Button>
 
-                    </div>
+                    </form>
+
+
+                    {/* STATUS */}
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+
+                        const form =
+                          e.currentTarget
+
+                        handleAction(
+                          setCodeStatus,
+                          new FormData(form),
+                          form,
+                        )
+                      }}
+                    >
+
+                      <input
+                        type="hidden"
+                        name="codeId"
+                        value={code.id}
+                      />
+
+                      <input
+                        type="hidden"
+                        name="status"
+                        value={
+                          code.status === 'active'
+                            ? 'inactive'
+                            : 'active'
+                        }
+                      />
+
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending}
+                      >
+                        {code.status === 'active'
+                          ? 'Desativar'
+                          : 'Ativar'}
+                      </Button>
+
+                    </form>
+
+
+                    {/* EXCLUIR */}
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={isPending}
+                      onClick={() => {
+                        const confirmed =
+                          window.confirm(
+                            `Excluir o código ${code.code}?`,
+                          )
+
+                        if (!confirmed) {
+                          return
+                        }
+
+                        const formData =
+                          new FormData()
+
+                        formData.append(
+                          'codeId',
+                          code.id,
+                        )
+
+                        handleAction(
+                          deleteCode,
+                          formData,
+                        )
+                      }}
+                    >
+                      Excluir
+                    </Button>
+
                   </div>
+
                 </div>
-              )
-            })
+
+              </div>
+
+            ))
+
           )}
 
         </div>
+
       </section>
 
-      {/* ========================================= */}
-      {/* PEDIDOS */}
-      {/* ========================================= */}
+
+      {/* =====================================================
+          CÓDIGOS ENTREGUES
+      ====================================================== */}
 
       <section>
+
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
+          <div>
+
+            <h2 className="text-lg font-semibold">
+              Códigos entregues ({deliveredCodes.length})
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Histórico dos códigos que já foram entregues
+              aos clientes.
+            </p>
+
+          </div>
+
+          <div className="text-sm text-muted-foreground">
+            {deliveredCodes.length} entregues
+          </div>
+
+        </div>
+
+
+        <div className="mt-3 space-y-3">
+
+          {deliveredCodes.length === 0 ? (
+
+            <div className="rounded-xl border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
+              Nenhum código foi entregue ainda.
+            </div>
+
+          ) : (
+
+            deliveredCodes.map((code) => (
+
+              <div
+                key={code.id}
+                className="rounded-xl border border-border/60 bg-card p-4"
+              >
+
+                <div className="grid gap-4 lg:grid-cols-[1.2fr_1.5fr_1fr_1fr_auto] lg:items-center">
+
+                  {/* CÓDIGO */}
+
+                  <div>
+
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Código
+                    </p>
+
+                    <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
+                      {code.code}
+                    </code>
+
+                  </div>
+
+
+                  {/* CLIENTE */}
+
+                  <div>
+
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Cliente
+                    </p>
+
+                    <p className="break-all text-sm font-medium">
+                      {code.userEmail ??
+                        'Cliente não identificado'}
+                    </p>
+
+                  </div>
+
+
+                  {/* PRODUTO */}
+
+                  <div>
+
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Produto
+                    </p>
+
+                    <p className="text-sm">
+                      {code.productName ??
+                        'Estoque geral'}
+                    </p>
+
+                  </div>
+
+
+                  {/* DATA */}
+
+                  <div>
+
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Entregue em
+                    </p>
+
+                    <p className="text-sm">
+                      {code.assigned_at
+                        ? formatDate(
+                            code.assigned_at,
+                          )
+                        : '—'}
+                    </p>
+
+                  </div>
+
+
+                  {/* STATUS */}
+
+                  <div className="flex lg:justify-end">
+
+                    <StatusBadge
+                      status={code.status}
+                      type="code"
+                    />
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            ))
+
+          )}
+
+        </div>
+
+      </section>
+
+
+      {/* =====================================================
+          PEDIDOS
+      ====================================================== */}
+
+      <section>
+
         <h2 className="text-lg font-semibold">
           Pedidos ({orders.length})
         </h2>
@@ -581,7 +755,9 @@ CODIGO-003`}
           <table className="w-full text-sm">
 
             <thead className="bg-card text-left text-muted-foreground">
+
               <tr>
+
                 <th className="px-4 py-3">
                   Produto
                 </th>
@@ -601,12 +777,15 @@ CODIGO-003`}
                 <th className="px-4 py-3">
                   Status
                 </th>
+
               </tr>
+
             </thead>
 
             <tbody>
 
               {orders.map((order) => (
+
                 <tr
                   key={order.id}
                   className="border-t"
@@ -643,9 +822,10 @@ CODIGO-003`}
                         const form =
                           e.currentTarget
 
-                        executeAction(
+                        handleAction(
                           setOrderStatus,
                           new FormData(form),
+                          form,
                         )
                       }}
                     >
@@ -664,19 +844,23 @@ CODIGO-003`}
                         disabled={isPending}
                         className="h-9 rounded-md border bg-background px-2 text-sm"
                       >
+
                         {[
                           'pending',
                           'paid',
                           'delivered',
                           'cancelled',
                         ].map((status) => (
+
                           <option
                             key={status}
                             value={status}
                           >
                             {status}
                           </option>
+
                         ))}
+
                       </select>
 
                       <Button
@@ -691,7 +875,9 @@ CODIGO-003`}
                     </form>
 
                   </td>
+
                 </tr>
+
               ))}
 
             </tbody>
@@ -699,6 +885,7 @@ CODIGO-003`}
           </table>
 
         </div>
+
       </section>
 
     </div>
