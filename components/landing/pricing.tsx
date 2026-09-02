@@ -71,11 +71,11 @@ function getPriceLabel(quantity: number): string {
 
 function getNextPriceMessage(quantity: number): string | null {
   if (quantity < 5) {
-    return `A partir de 5 telas: R$ 34,00 por tela`
+    return 'A partir de 5 telas: R$ 34,00 por tela'
   }
 
   if (quantity < 10) {
-    return `A partir de 10 telas: R$ 33,00 por tela`
+    return 'A partir de 10 telas: R$ 33,00 por tela'
   }
 
   return 'Melhor preço disponível'
@@ -103,17 +103,12 @@ export function Pricing({
 
   /*
    * Usa o produto de 1 tela como produto base.
-   *
-   * A quantidade real da compra vem do seletor abaixo.
    */
   const product =
     products.find((item) => item.screens === 1) ??
     products[0] ??
     null
 
-  /*
-   * Quantidade começa SEMPRE em 1.
-   */
   const [quantity, setQuantity] =
     useState(1)
 
@@ -356,86 +351,76 @@ export function Pricing({
     <>
       <section
         id="planos"
-        className="scroll-mt-20 bg-secondary/30 py-20"
+        className="scroll-mt-20 bg-secondary/30 py-10 sm:py-16"
       >
-        <div className="mx-auto max-w-3xl px-4">
+        <div className="mx-auto max-w-3xl px-3 sm:px-4">
 
           {/* CABEÇALHO */}
 
           <div className="mx-auto max-w-2xl text-center">
-
-            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
+            <h2 className="text-2xl font-bold tracking-tight sm:text-4xl">
               LD CLOUD VIP
             </h2>
 
-            <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground sm:mt-4 sm:text-base">
               Escolha quantas telas você precisa e pague tudo em um único PIX.
             </p>
-
           </div>
 
           {/* CARD ÚNICO */}
 
           {product && (
-            <div className="relative mx-auto mt-12 max-w-xl rounded-2xl border border-primary bg-card p-6 shadow-lg shadow-primary/10 sm:p-8">
+            <div className="relative mx-auto mt-7 max-w-xl rounded-2xl border border-primary bg-card p-4 shadow-lg shadow-primary/10 sm:mt-10 sm:p-7">
 
               {/* BADGE */}
 
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-[10px] font-semibold text-primary-foreground sm:px-4 sm:text-xs">
                 30 dias de acesso
               </div>
 
               {/* PRODUTO */}
 
               <div className="text-center">
-
-                <h3 className="text-2xl font-bold">
+                <h3 className="text-xl font-bold sm:text-2xl">
                   LD CLOUD VIP
                 </h3>
 
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
                   Acesso VIP por 30 dias
                 </p>
-
               </div>
 
               {/* PREÇO */}
 
-              <div className="mt-8 text-center">
-
-                <div className="flex items-end justify-center gap-2">
-
-                  <span className="text-5xl font-bold tracking-tight">
+              <div className="mt-5 text-center sm:mt-7">
+                <div className="flex items-end justify-center gap-1.5">
+                  <span className="text-4xl font-bold tracking-tight sm:text-5xl">
                     {formatBRL(unitPriceCents)}
                   </span>
 
-                  <span className="mb-2 text-sm text-muted-foreground">
+                  <span className="mb-1.5 text-xs text-muted-foreground sm:mb-2 sm:text-sm">
                     / tela
                   </span>
-
                 </div>
 
-                <p className="mt-2 text-sm font-medium text-primary">
+                <p className="mt-1 text-xs font-medium text-primary sm:mt-2 sm:text-sm">
                   {priceLabel}
                 </p>
-
               </div>
 
               {/* QUANTIDADE */}
 
-              <div className="mt-8">
-
-                <p className="mb-3 text-center text-sm font-semibold">
+              <div className="mt-5 sm:mt-7">
+                <p className="mb-2 text-center text-xs font-semibold sm:mb-3 sm:text-sm">
                   Quantidade de telas
                 </p>
 
-                <div className="mx-auto flex max-w-sm items-center gap-3">
-
+                <div className="mx-auto flex max-w-sm items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-12 shrink-0"
+                    className="size-10 shrink-0 sm:size-12"
                     onClick={() =>
                       changeQuantity(
                         quantity - 1,
@@ -447,7 +432,7 @@ export function Pricing({
                     }
                     aria-label="Diminuir quantidade"
                   >
-                    <Minus className="size-5" />
+                    <Minus className="size-4 sm:size-5" />
                   </Button>
 
                   <input
@@ -472,7 +457,7 @@ export function Pricing({
                         )
                       }
                     }}
-                    className="h-12 w-full rounded-lg border bg-background px-3 text-center text-xl font-bold"
+                    className="h-10 w-full rounded-lg border bg-background px-3 text-center text-lg font-bold sm:h-12 sm:text-xl"
                     aria-label="Quantidade de telas"
                   />
 
@@ -480,7 +465,7 @@ export function Pricing({
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-12 shrink-0"
+                    className="size-10 shrink-0 sm:size-12"
                     onClick={() =>
                       changeQuantity(
                         quantity + 1,
@@ -492,19 +477,15 @@ export function Pricing({
                     }
                     aria-label="Aumentar quantidade"
                   >
-                    <Plus className="size-5" />
+                    <Plus className="size-4 sm:size-5" />
                   </Button>
-
                 </div>
-
               </div>
 
-              {/* DESCONTO POR QUANTIDADE */}
+              {/* FAIXAS DE PREÇO */}
 
-              <div className="mt-6 rounded-xl border bg-secondary/40 p-4">
-
-                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-
+              <div className="mt-4 rounded-xl border bg-secondary/40 p-3 sm:mt-5 sm:p-4">
+                <div className="grid grid-cols-3 gap-1 text-center sm:gap-2">
                   <div
                     className={
                       quantity < 5
@@ -512,11 +493,13 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    1–4 telas
-                    <br />
-                    <span className="text-xs">
-                      R$ 35,00 / tela
-                    </span>
+                    <p className="text-xs">
+                      1–4
+                    </p>
+
+                    <p className="text-[10px] sm:text-xs">
+                      R$ 35/tela
+                    </p>
                   </div>
 
                   <div
@@ -527,11 +510,13 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    5–9 telas
-                    <br />
-                    <span className="text-xs">
-                      R$ 34,00 / tela
-                    </span>
+                    <p className="text-xs">
+                      5–9
+                    </p>
+
+                    <p className="text-[10px] sm:text-xs">
+                      R$ 34/tela
+                    </p>
                   </div>
 
                   <div
@@ -541,29 +526,27 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    10+ telas
-                    <br />
-                    <span className="text-xs">
-                      R$ 33,00 / tela
-                    </span>
-                  </div>
+                    <p className="text-xs">
+                      10+
+                    </p>
 
+                    <p className="text-[10px] sm:text-xs">
+                      R$ 33/tela
+                    </p>
+                  </div>
                 </div>
 
                 {nextPriceMessage && (
-                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                  <p className="mt-2 text-center text-[10px] text-muted-foreground sm:text-xs">
                     {nextPriceMessage}
                   </p>
                 )}
-
               </div>
 
               {/* TOTAL */}
 
-              <div className="mt-6 rounded-xl border bg-background p-5">
-
-                <div className="flex items-center justify-between text-sm">
-
+              <div className="mt-4 rounded-xl border bg-background p-3.5 sm:mt-5 sm:p-5">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">
                     {quantity} ×{' '}
                     {formatBRL(
@@ -576,63 +559,61 @@ export function Pricing({
                       totalCents,
                     )}
                   </span>
-
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
-
-                  <span className="text-base font-semibold">
+                <div className="mt-2.5 flex items-center justify-between sm:mt-3">
+                  <span className="text-sm font-semibold sm:text-base">
                     Total a pagar
                   </span>
 
-                  <span className="text-2xl font-bold">
+                  <span className="text-xl font-bold sm:text-2xl">
                     {formatBRL(
                       totalCents,
                     )}
                   </span>
-
                 </div>
-
               </div>
 
               {/* BENEFÍCIOS */}
 
-              <ul className="mt-7 space-y-3">
+              <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:mt-6 sm:grid-cols-1 sm:gap-3">
+                <li className="flex items-start gap-2 text-xs sm:text-sm">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
 
-                <li className="flex items-center gap-3 text-sm">
-                  <Check className="size-4 shrink-0 text-primary" />
                   <span className="text-muted-foreground">
-                    Telas simultâneas conforme quantidade comprada
+                    Telas simultâneas conforme quantidade
                   </span>
                 </li>
 
-                <li className="flex items-center gap-3 text-sm">
-                  <Check className="size-4 shrink-0 text-primary" />
+                <li className="flex items-start gap-2 text-xs sm:text-sm">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+
                   <span className="text-muted-foreground">
                     Acesso VIP por 30 dias
                   </span>
                 </li>
 
-                <li className="flex items-center gap-3 text-sm">
-                  <Check className="size-4 shrink-0 text-primary" />
+                <li className="flex items-start gap-2 text-xs sm:text-sm">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+
                   <span className="text-muted-foreground">
                     Suporte via WhatsApp
                   </span>
                 </li>
 
-                <li className="flex items-center gap-3 text-sm">
-                  <Check className="size-4 shrink-0 text-primary" />
+                <li className="flex items-start gap-2 text-xs sm:text-sm">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+
                   <span className="text-muted-foreground">
                     Um único pagamento PIX
                   </span>
                 </li>
-
               </ul>
 
               {/* BOTÃO */}
 
               <Button
-                className="mt-8 h-12 w-full text-base"
+                className="mt-5 h-11 w-full text-sm font-semibold sm:mt-7 sm:h-12 sm:text-base"
                 onClick={handleBuy}
                 disabled={
                   pending ||
@@ -641,7 +622,7 @@ export function Pricing({
               >
                 {pending ? (
                   <>
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin sm:size-5" />
                     Processando...
                   </>
                 ) : (
@@ -654,10 +635,8 @@ export function Pricing({
                   </>
                 )}
               </Button>
-
             </div>
           )}
-
         </div>
       </section>
 
@@ -666,9 +645,8 @@ export function Pricing({
       ============================================ */}
 
       {payment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-
-          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4">
+          <div className="relative max-h-[95vh] w-full max-w-md overflow-y-auto rounded-2xl bg-background p-4 shadow-2xl sm:p-6">
 
             <button
               type="button"
@@ -676,7 +654,7 @@ export function Pricing({
                 setPayment(null)
                 setOrderStatus('pending')
               }}
-              className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
               aria-label="Fechar"
             >
               <X className="size-5" />
@@ -685,18 +663,16 @@ export function Pricing({
             {/* PAGAMENTO CONFIRMADO */}
 
             {paymentConfirmed ? (
-
-              <div className="py-6 text-center">
-
+              <div className="py-5 text-center sm:py-6">
                 <div className="flex justify-center">
-                  <CheckCircle2 className="size-20 text-green-500" />
+                  <CheckCircle2 className="size-16 text-green-500 sm:size-20" />
                 </div>
 
-                <h2 className="mt-5 text-2xl font-bold">
+                <h2 className="mt-4 text-xl font-bold sm:mt-5 sm:text-2xl">
                   Pagamento confirmado!
                 </h2>
 
-                <p className="mt-3 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Seu pagamento foi aprovado com sucesso.
                 </p>
 
@@ -705,7 +681,7 @@ export function Pricing({
                 </p>
 
                 <Button
-                  className="mt-8 w-full"
+                  className="mt-6 w-full sm:mt-8"
                   onClick={() => {
                     setPayment(null)
                     router.push(
@@ -725,16 +701,10 @@ export function Pricing({
                 >
                   Fechar
                 </Button>
-
               </div>
-
             ) : orderStatus === 'cancelled' ? (
-
-              /* PAGAMENTO CANCELADO */
-
-              <div className="py-6 text-center">
-
-                <h2 className="text-2xl font-bold">
+              <div className="py-5 text-center sm:py-6">
+                <h2 className="text-xl font-bold sm:text-2xl">
                   Pagamento cancelado
                 </h2>
 
@@ -744,23 +714,17 @@ export function Pricing({
 
                 <Button
                   variant="outline"
-                  className="mt-8 w-full"
+                  className="mt-6 w-full sm:mt-8"
                   onClick={() => {
                     setPayment(null)
                   }}
                 >
                   Fechar
                 </Button>
-
               </div>
-
             ) : (
-
-              /* AGUARDANDO PAGAMENTO */
-
               <div className="text-center">
-
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl font-bold sm:text-2xl">
                   Pague com PIX
                 </h2>
 
@@ -769,38 +733,29 @@ export function Pricing({
                 </p>
 
                 {qrImage ? (
-
-                  <div className="mt-6 flex justify-center">
-
-                    <div className="rounded-xl bg-white p-3">
-
+                  <div className="mt-5 flex justify-center sm:mt-6">
+                    <div className="rounded-xl bg-white p-2.5 sm:p-3">
                       <img
                         src={qrImage}
                         alt="QR Code PIX"
-                        className="h-56 w-56"
+                        className="h-52 w-52 sm:h-56 sm:w-56"
                       />
-
                     </div>
-
                   </div>
-
                 ) : (
-
-                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                  <div className="mt-5 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
                     O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
                   </div>
-
                 )}
 
                 {payment.qrCode && (
                   <>
-
-                    <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+                    <div className="mt-5 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
                       {payment.qrCode}
                     </div>
 
                     <Button
-                      className="mt-4 w-full"
+                      className="mt-3 w-full"
                       onClick={
                         copyPixCode
                       }
@@ -808,48 +763,39 @@ export function Pricing({
                       <Copy className="size-4" />
                       Copiar código PIX
                     </Button>
-
                   </>
                 )}
 
-                {/* STATUS AUTOMÁTICO */}
-
-                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-
+                <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground sm:mt-5 sm:text-sm">
                   <Loader2 className="size-4 animate-spin text-primary" />
 
                   <span>
                     {checkingPayment
                       ? 'Verificando pagamento...'
-                      : 'Aguardando confirmação do pagamento...'}
+                      : 'Aguardando confirmação...'}
                   </span>
-
                 </div>
 
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-[10px] text-muted-foreground sm:text-xs">
                   Esta página verifica automaticamente seu pagamento.
                 </p>
 
-                <p className="mt-5 text-xs text-muted-foreground">
+                <p className="mt-4 text-[10px] text-muted-foreground sm:mt-5 sm:text-xs">
                   Pedido: {payment.orderId}
                 </p>
 
                 <Button
                   variant="outline"
-                  className="mt-4 w-full"
+                  className="mt-3 w-full"
                   onClick={() => {
                     setPayment(null)
                   }}
                 >
                   Fechar
                 </Button>
-
               </div>
-
             )}
-
           </div>
-
         </div>
       )}
     </>
