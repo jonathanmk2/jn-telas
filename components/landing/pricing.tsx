@@ -39,12 +39,15 @@ type OrderStatus =
   | 'unknown'
 
 /*
+ * ============================================================
  * REGRA DE PREÇO
+ * ============================================================
  *
- * 1 a 4 telas  = R$ 35 cada
- * 5 a 9 telas  = R$ 34 cada
- * 10+ telas    = R$ 33 cada
+ * 1 a 4 telas  = R$ 35,00 cada
+ * 5 a 9 telas  = R$ 34,00 cada
+ * 10+ telas    = R$ 33,00 cada
  */
+
 function getUnitPriceCents(quantity: number): number {
   if (quantity >= 10) {
     return 3300
@@ -69,7 +72,9 @@ function getPriceLabel(quantity: number): string {
   return 'R$ 35,00 por tela'
 }
 
-function getNextPriceMessage(quantity: number): string | null {
+function getNextPriceMessage(
+  quantity: number,
+): string | null {
   if (quantity < 5) {
     return 'A partir de 5 telas: R$ 34,00 por tela'
   }
@@ -82,18 +87,19 @@ function getNextPriceMessage(quantity: number): string | null {
 }
 
 /*
- * VALIDAÇÃO DO TEXTO DO CAMPO
+ * ============================================================
+ * VALIDAÇÃO DA QUANTIDADE
+ * ============================================================
  *
- * Aceita somente números inteiros de 1 até 500.
- *
- * Válidos:
+ * Aceita:
  * 1
+ * 2
  * 5
  * 10
  * 100
  * 500
  *
- * Inválidos:
+ * Rejeita:
  * 0
  * 00
  * -1
@@ -101,9 +107,11 @@ function getNextPriceMessage(quantity: number): string | null {
  * 5e2
  * 501
  * abc
- * espaços
  */
-function isValidQuantityInput(value: string): boolean {
+
+function isValidQuantityInput(
+  value: string,
+): boolean {
   return /^(?:[1-9]\d{0,2}|500)$/.test(value)
 }
 
@@ -116,7 +124,8 @@ export function Pricing({
 }) {
   const router = useRouter()
 
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] =
+    useTransition()
 
   const [payment, setPayment] =
     useState<PaymentData | null>(null)
@@ -128,29 +137,40 @@ export function Pricing({
     useState(false)
 
   /*
-   * Usa o produto de 1 tela como produto base.
-   */
-  const product =
-    products.find((item) => item.screens === 1) ??
-    products[0] ??
-    null
-
-  /*
    * Quantidade válida usada nos cálculos.
    */
   const [quantity, setQuantity] =
     useState(1)
 
   /*
-   * Texto que está efetivamente dentro
-   * do campo de quantidade.
+   * Texto que está dentro do campo.
    *
-   * É separado de "quantity" para impedir
-   * que valores como "5e2" sejam convertidos
-   * automaticamente para 500.
+   * Mantemos separado de "quantity" para que:
+   *
+   * 5e2
+   * 501
+   * 1.5
+   *
+   * não sejam convertidos automaticamente.
    */
   const [quantityInput, setQuantityInput] =
     useState('1')
+
+  /*
+   * Erro visível no card.
+   */
+  const [quantityError, setQuantityError] =
+    useState<string | null>(null)
+
+  /*
+   * Usa o produto de 1 tela como produto base.
+   */
+  const product =
+    products.find(
+      (item) => item.screens === 1,
+    ) ??
+    products[0] ??
+    null
 
   function changeQuantity(value: number) {
     if (!Number.isFinite(value)) {
@@ -159,12 +179,23 @@ export function Pricing({
 
     const newQuantity = Math.max(
       1,
-      Math.min(500, Math.floor(value)),
+      Math.min(
+        500,
+        Math.floor(value),
+      ),
     )
 
     setQuantity(newQuantity)
-    setQuantityInput(String(newQuantity))
+    setQuantityInput(
+      String(newQuantity),
+    )
+    setQuantityError(null)
   }
+
+  const inputIsValid =
+    isValidQuantityInput(
+      quantityInput,
+    )
 
   const unitPriceCents =
     getUnitPriceCents(quantity)
@@ -179,6 +210,9 @@ export function Pricing({
     getNextPriceMessage(quantity)
 
   function handleBuy() {
+    /*
+     * Produto inexistente.
+     */
     if (!product) {
       toast.error(
         'Produto não encontrado.',
@@ -187,6 +221,9 @@ export function Pricing({
       return
     }
 
+    /*
+     * Usuário não logado.
+     */
     if (!isLoggedIn) {
       router.push(
         '/auth/sign-up?next=/minha-conta',
@@ -196,25 +233,37 @@ export function Pricing({
     }
 
     /*
-     * Primeiro validamos exatamente o que
-     * está escrito no campo.
+     * ========================================================
+     * VALIDAÇÃO PRINCIPAL DO CAMPO
+     * ========================================================
      *
-     * Isso impede:
-     * 5e2
-     * 1.5
-     * -1
-     * 0
-     * 501
-     * etc.
+     * Aqui NÃO usamos Number(quantityInput)
+     * antes da validação.
+     *
+     * Portanto:
+     *
+     * 5e2 -> inválido
+     * 501 -> inválido
+     * 1.5 -> inválido
      */
-    if (!isValidQuantityInput(quantityInput)) {
-      toast.error(
-        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
+    if (
+      !isValidQuantityInput(
+        quantityInput,
       )
+    ) {
+      const message =
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.'
+
+      setQuantityError(message)
+
+      toast.error(message)
 
       return
     }
 
+    /*
+     * Só convertemos depois de validar.
+     */
     const parsedQuantity =
       Number(quantityInput)
 
@@ -222,16 +271,31 @@ export function Pricing({
      * Segunda camada de segurança.
      */
     if (
-      !Number.isInteger(parsedQuantity) ||
+      !Number.isInteger(
+        parsedQuantity,
+      ) ||
       parsedQuantity < 1 ||
       parsedQuantity > 500
     ) {
-      toast.error(
-        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
-      )
+      const message =
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.'
+
+      setQuantityError(message)
+
+      toast.error(message)
 
       return
     }
+
+    /*
+     * Garante que a quantidade usada
+     * no cálculo seja exatamente a enviada.
+     */
+    setQuantity(parsedQuantity)
+    setQuantityInput(
+      String(parsedQuantity),
+    )
+    setQuantityError(null)
 
     console.log(
       'Iniciando compra:',
@@ -265,12 +329,16 @@ export function Pricing({
               res.qrCodeBase64,
           })
 
-          setOrderStatus('pending')
+          setOrderStatus(
+            'pending',
+          )
 
           toast.success(
             'Pagamento PIX gerado com sucesso!',
           )
-        } else if (res.needsAuth) {
+        } else if (
+          res.needsAuth
+        ) {
           router.push(
             '/auth/login?next=/minha-conta',
           )
@@ -280,7 +348,9 @@ export function Pricing({
             res.error,
           )
 
-          toast.error(res.error)
+          toast.error(
+            res.error,
+          )
         }
       } catch (error) {
         console.error(
@@ -319,9 +389,11 @@ export function Pricing({
     }
   }
 
-  // ============================================
-  // VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
-  // ============================================
+  /*
+   * ============================================================
+   * VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
+   * ============================================================
+   */
 
   useEffect(() => {
     if (!payment?.orderId) {
@@ -374,7 +446,9 @@ export function Pricing({
           (data.status as OrderStatus) ??
           'unknown'
 
-        setOrderStatus(newStatus)
+        setOrderStatus(
+          newStatus,
+        )
 
         if (
           newStatus === 'paid' ||
@@ -399,21 +473,26 @@ export function Pricing({
         )
       } finally {
         if (active) {
-          setCheckingPayment(false)
+          setCheckingPayment(
+            false,
+          )
         }
       }
     }
 
     checkPayment()
 
-    const interval = setInterval(
-      checkPayment,
-      3000,
-    )
+    const interval =
+      setInterval(
+        checkPayment,
+        3000,
+      )
 
     return () => {
       active = false
-      clearInterval(interval)
+      clearInterval(
+        interval,
+      )
     }
   }, [
     payment?.orderId,
@@ -437,77 +516,82 @@ export function Pricing({
     <>
       <section
         id="planos"
-        className="scroll-mt-20 bg-secondary/30 py-10 sm:py-16"
+        className="scroll-mt-20 bg-secondary/30 py-20"
       >
-        <div className="mx-auto max-w-3xl px-3 sm:px-4">
+        <div className="mx-auto max-w-3xl px-4">
 
           {/* CABEÇALHO */}
 
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
               LD CLOUD VIP
             </h2>
 
-            <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground sm:mt-4 sm:text-base">
+            <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
               Escolha quantas telas você precisa e pague tudo em um único PIX.
             </p>
           </div>
 
-          {/* CARD ÚNICO */}
+          {/* CARD */}
 
           {product && (
-            <div className="relative mx-auto mt-7 max-w-xl rounded-2xl border border-primary bg-card p-4 shadow-lg shadow-primary/10 sm:mt-10 sm:p-7">
+            <div className="relative mx-auto mt-12 max-w-xl rounded-2xl border border-primary bg-card p-6 shadow-lg shadow-primary/10 sm:p-8">
 
               {/* BADGE */}
 
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-[10px] font-semibold text-primary-foreground sm:px-4 sm:text-xs">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
                 30 dias de acesso
               </div>
 
               {/* PRODUTO */}
 
               <div className="text-center">
-                <h3 className="text-xl font-bold sm:text-2xl">
+                <h3 className="text-2xl font-bold">
                   LD CLOUD VIP
                 </h3>
 
-                <p className="mt-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Acesso VIP por 30 dias
                 </p>
               </div>
 
               {/* PREÇO */}
 
-              <div className="mt-5 text-center sm:mt-7">
-                <div className="flex items-end justify-center gap-1.5">
-                  <span className="text-4xl font-bold tracking-tight sm:text-5xl">
-                    {formatBRL(unitPriceCents)}
+              <div className="mt-8 text-center">
+                <div className="flex items-end justify-center gap-2">
+                  <span className="text-5xl font-bold tracking-tight">
+                    {formatBRL(
+                      unitPriceCents,
+                    )}
                   </span>
 
-                  <span className="mb-1.5 text-xs text-muted-foreground sm:mb-2 sm:text-sm">
+                  <span className="mb-2 text-sm text-muted-foreground">
                     / tela
                   </span>
                 </div>
 
-                <p className="mt-1 text-xs font-medium text-primary sm:mt-2 sm:text-sm">
+                <p className="mt-2 text-sm font-medium text-primary">
                   {priceLabel}
                 </p>
               </div>
 
               {/* QUANTIDADE */}
 
-              <div className="mt-5 sm:mt-7">
-                <p className="mb-2 text-center text-xs font-semibold sm:mb-3 sm:text-sm">
+              <div className="mt-8">
+
+                <p className="mb-3 text-center text-sm font-semibold">
                   Quantidade de telas
                 </p>
 
-                <div className="mx-auto flex max-w-sm items-center gap-2">
+                <div className="mx-auto flex max-w-sm items-center gap-3">
+
+                  {/* MENOS */}
 
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-10 shrink-0 sm:size-12"
+                    className="size-12 shrink-0"
                     onClick={() =>
                       changeQuantity(
                         quantity - 1,
@@ -519,8 +603,10 @@ export function Pricing({
                     }
                     aria-label="Diminuir quantidade"
                   >
-                    <Minus className="size-4 sm:size-5" />
+                    <Minus className="size-5" />
                   </Button>
+
+                  {/* INPUT */}
 
                   <input
                     type="text"
@@ -528,31 +614,36 @@ export function Pricing({
                     value={quantityInput}
                     disabled={pending}
                     onChange={(event) => {
-                      /*
-                       * IMPORTANTE:
-                       *
-                       * Não usamos:
-                       *
-                       * Number(event.target.value)
-                       *
-                       * aqui.
-                       *
-                       * Dessa forma "5e2" permanece
-                       * exatamente "5e2" no campo,
-                       * em vez de virar 500.
-                       */
                       const value =
                         event.target.value
 
-                      setQuantityInput(value)
+                      /*
+                       * Mantém exatamente o que
+                       * foi digitado.
+                       *
+                       * 5e2 continua 5e2.
+                       * 501 continua 501.
+                       */
+                      setQuantityInput(
+                        value,
+                      )
 
                       /*
-                       * Só altera a quantidade usada
-                       * no cálculo quando o valor é
-                       * realmente válido.
+                       * Limpa erro enquanto
+                       * o usuário corrige.
+                       */
+                      setQuantityError(
+                        null,
+                      )
+
+                      /*
+                       * Só muda "quantity"
+                       * se o valor for válido.
                        */
                       if (
-                        isValidQuantityInput(value)
+                        isValidQuantityInput(
+                          value,
+                        )
                       ) {
                         setQuantity(
                           Number(value),
@@ -561,30 +652,33 @@ export function Pricing({
                     }}
                     onBlur={() => {
                       /*
-                       * Se sair do campo com algo
-                       * inválido, volta para a última
-                       * quantidade válida.
+                       * Não força automaticamente
+                       * um valor inválido para 1.
+                       *
+                       * Mantemos o valor escrito para
+                       * o usuário poder enxergar o erro.
                        */
-                      if (
-                        !isValidQuantityInput(
-                          quantityInput,
-                        )
-                      ) {
-                        setQuantityInput(
-                          String(quantity),
-                        )
-                      }
                     }}
-                    className="h-10 w-full rounded-lg border bg-background px-3 text-center text-lg font-bold sm:h-12 sm:text-xl"
+                    className={`h-12 w-full rounded-lg border bg-background px-3 text-center text-xl font-bold outline-none ${
+                      quantityError ||
+                      !inputIsValid
+                        ? 'border-red-500 focus:border-red-500'
+                        : ''
+                    }`}
                     aria-label="Quantidade de telas"
+                    aria-invalid={
+                      !inputIsValid
+                    }
                     autoComplete="off"
                   />
+
+                  {/* MAIS */}
 
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-10 shrink-0 sm:size-12"
+                    className="size-12 shrink-0"
                     onClick={() =>
                       changeQuantity(
                         quantity + 1,
@@ -596,20 +690,31 @@ export function Pricing({
                     }
                     aria-label="Aumentar quantidade"
                   >
-                    <Plus className="size-4 sm:size-5" />
+                    <Plus className="size-5" />
                   </Button>
 
                 </div>
 
-                <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                  Informe uma quantidade inteira de 1 a 500.
-                </p>
+                {/* MENSAGEM DE VALIDAÇÃO */}
+
+                {quantityError ||
+                !inputIsValid ? (
+                  <p className="mt-2 text-center text-xs font-medium text-red-500">
+                    Quantidade inválida. Digite um número inteiro entre 1 e 500.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Informe uma quantidade inteira de 1 a 500.
+                  </p>
+                )}
+
               </div>
 
-              {/* FAIXAS DE PREÇO */}
+              {/* DESCONTO POR QUANTIDADE */}
 
-              <div className="mt-4 rounded-xl border bg-secondary/40 p-3 sm:mt-5 sm:p-4">
-                <div className="grid grid-cols-3 gap-1 text-center sm:gap-2">
+              <div className="mt-6 rounded-xl border bg-secondary/40 p-4">
+
+                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
 
                   <div
                     className={
@@ -618,13 +723,13 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    <p className="text-xs">
-                      1–4
-                    </p>
+                    1–4 telas
 
-                    <p className="text-[10px] sm:text-xs">
-                      R$ 35/tela
-                    </p>
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 35,00 / tela
+                    </span>
                   </div>
 
                   <div
@@ -635,13 +740,13 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    <p className="text-xs">
-                      5–9
-                    </p>
+                    5–9 telas
 
-                    <p className="text-[10px] sm:text-xs">
-                      R$ 34/tela
-                    </p>
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 34,00 / tela
+                    </span>
                   </div>
 
                   <div
@@ -651,87 +756,108 @@ export function Pricing({
                         : 'text-muted-foreground'
                     }
                   >
-                    <p className="text-xs">
-                      10+
-                    </p>
+                    10+ telas
 
-                    <p className="text-[10px] sm:text-xs">
-                      R$ 33/tela
-                    </p>
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 33,00 / tela
+                    </span>
                   </div>
 
                 </div>
 
                 {nextPriceMessage && (
-                  <p className="mt-2 text-center text-[10px] text-muted-foreground sm:text-xs">
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
                     {nextPriceMessage}
                   </p>
                 )}
+
               </div>
 
               {/* TOTAL */}
 
-              <div className="mt-4 rounded-xl border bg-background p-3.5 sm:mt-5 sm:p-5">
+              <div className="mt-6 rounded-xl border bg-background p-5">
 
-                <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-muted-foreground">
-                    {quantity} ×{' '}
-                    {formatBRL(
-                      unitPriceCents,
-                    )}
-                  </span>
+                {inputIsValid ? (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
 
-                  <span className="font-semibold">
-                    {formatBRL(
-                      totalCents,
-                    )}
-                  </span>
-                </div>
+                      <span className="text-muted-foreground">
+                        {quantity} ×{' '}
+                        {formatBRL(
+                          unitPriceCents,
+                        )}
+                      </span>
 
-                <div className="mt-2.5 flex items-center justify-between sm:mt-3">
-                  <span className="text-sm font-semibold sm:text-base">
-                    Total a pagar
-                  </span>
+                      <span className="font-semibold">
+                        {formatBRL(
+                          totalCents,
+                        )}
+                      </span>
 
-                  <span className="text-xl font-bold sm:text-2xl">
-                    {formatBRL(
-                      totalCents,
-                    )}
-                  </span>
-                </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+
+                      <span className="text-base font-semibold">
+                        Total a pagar
+                      </span>
+
+                      <span className="text-2xl font-bold">
+                        {formatBRL(
+                          totalCents,
+                        )}
+                      </span>
+
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-1 text-center">
+
+                    <p className="text-sm font-semibold text-red-500">
+                      Quantidade inválida
+                    </p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Digite um número inteiro entre 1 e 500.
+                    </p>
+
+                  </div>
+                )}
 
               </div>
 
               {/* BENEFÍCIOS */}
 
-              <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:mt-6 sm:grid-cols-1 sm:gap-3">
+              <ul className="mt-7 space-y-3">
 
-                <li className="flex items-start gap-2 text-xs sm:text-sm">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
-                    Telas simultâneas conforme quantidade
+                    Telas simultâneas conforme quantidade comprada
                   </span>
                 </li>
 
-                <li className="flex items-start gap-2 text-xs sm:text-sm">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Acesso VIP por 30 dias
                   </span>
                 </li>
 
-                <li className="flex items-start gap-2 text-xs sm:text-sm">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Suporte via WhatsApp
                   </span>
                 </li>
 
-                <li className="flex items-start gap-2 text-xs sm:text-sm">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary sm:size-4" />
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Um único pagamento PIX
@@ -743,7 +869,7 @@ export function Pricing({
               {/* BOTÃO */}
 
               <Button
-                className="mt-5 h-11 w-full text-sm font-semibold sm:mt-7 sm:h-12 sm:text-base"
+                className="mt-8 h-12 w-full text-base"
                 onClick={handleBuy}
                 disabled={
                   pending ||
@@ -752,7 +878,7 @@ export function Pricing({
               >
                 {pending ? (
                   <>
-                    <Loader2 className="size-4 animate-spin sm:size-5" />
+                    <Loader2 className="size-5 animate-spin" />
                     Processando...
                   </>
                 ) : (
@@ -772,22 +898,26 @@ export function Pricing({
         </div>
       </section>
 
-      {/* ============================================
+      {/* =====================================================
           MODAL PIX
-      ============================================ */}
+      ===================================================== */}
 
       {payment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
 
-          <div className="relative max-h-[95vh] w-full max-w-md overflow-y-auto rounded-2xl bg-background p-4 shadow-2xl sm:p-6">
+          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
+
+            {/* FECHAR */}
 
             <button
               type="button"
               onClick={() => {
                 setPayment(null)
-                setOrderStatus('pending')
+                setOrderStatus(
+                  'pending',
+                )
               }}
-              className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
+              className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Fechar"
             >
               <X className="size-5" />
@@ -796,17 +926,18 @@ export function Pricing({
             {/* PAGAMENTO CONFIRMADO */}
 
             {paymentConfirmed ? (
-              <div className="py-5 text-center sm:py-6">
+
+              <div className="py-6 text-center">
 
                 <div className="flex justify-center">
-                  <CheckCircle2 className="size-16 text-green-500 sm:size-20" />
+                  <CheckCircle2 className="size-20 text-green-500" />
                 </div>
 
-                <h2 className="mt-4 text-xl font-bold sm:mt-5 sm:text-2xl">
+                <h2 className="mt-5 text-2xl font-bold">
                   Pagamento confirmado!
                 </h2>
 
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-3 text-sm text-muted-foreground">
                   Seu pagamento foi aprovado com sucesso.
                 </p>
 
@@ -815,7 +946,7 @@ export function Pricing({
                 </p>
 
                 <Button
-                  className="mt-6 w-full sm:mt-8"
+                  className="mt-8 w-full"
                   onClick={() => {
                     setPayment(null)
 
@@ -841,9 +972,11 @@ export function Pricing({
 
             ) : orderStatus === 'cancelled' ? (
 
-              <div className="py-5 text-center sm:py-6">
+              /* PAGAMENTO CANCELADO */
 
-                <h2 className="text-xl font-bold sm:text-2xl">
+              <div className="py-6 text-center">
+
+                <h2 className="text-2xl font-bold">
                   Pagamento cancelado
                 </h2>
 
@@ -853,7 +986,7 @@ export function Pricing({
 
                 <Button
                   variant="outline"
-                  className="mt-6 w-full sm:mt-8"
+                  className="mt-8 w-full"
                   onClick={() => {
                     setPayment(null)
                   }}
@@ -865,9 +998,11 @@ export function Pricing({
 
             ) : (
 
+              /* AGUARDANDO PAGAMENTO */
+
               <div className="text-center">
 
-                <h2 className="text-xl font-bold sm:text-2xl">
+                <h2 className="text-2xl font-bold">
                   Pague com PIX
                 </h2>
 
@@ -876,31 +1011,38 @@ export function Pricing({
                 </p>
 
                 {qrImage ? (
-                  <div className="mt-5 flex justify-center sm:mt-6">
 
-                    <div className="rounded-xl bg-white p-2.5 sm:p-3">
+                  <div className="mt-6 flex justify-center">
+
+                    <div className="rounded-xl bg-white p-3">
+
                       <img
                         src={qrImage}
                         alt="QR Code PIX"
-                        className="h-52 w-52 sm:h-56 sm:w-56"
+                        className="h-56 w-56"
                       />
+
                     </div>
 
                   </div>
+
                 ) : (
-                  <div className="mt-5 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+
+                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
                     O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
                   </div>
+
                 )}
 
                 {payment.qrCode && (
                   <>
-                    <div className="mt-5 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+
+                    <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
                       {payment.qrCode}
                     </div>
 
                     <Button
-                      className="mt-3 w-full"
+                      className="mt-4 w-full"
                       onClick={
                         copyPixCode
                       }
@@ -908,32 +1050,35 @@ export function Pricing({
                       <Copy className="size-4" />
                       Copiar código PIX
                     </Button>
+
                   </>
                 )}
 
-                <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground sm:mt-5 sm:text-sm">
+                {/* STATUS AUTOMÁTICO */}
+
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
 
                   <Loader2 className="size-4 animate-spin text-primary" />
 
                   <span>
                     {checkingPayment
                       ? 'Verificando pagamento...'
-                      : 'Aguardando confirmação...'}
+                      : 'Aguardando confirmação do pagamento...'}
                   </span>
 
                 </div>
 
-                <p className="mt-2 text-[10px] text-muted-foreground sm:text-xs">
+                <p className="mt-2 text-xs text-muted-foreground">
                   Esta página verifica automaticamente seu pagamento.
                 </p>
 
-                <p className="mt-4 text-[10px] text-muted-foreground sm:mt-5 sm:text-xs">
+                <p className="mt-5 text-xs text-muted-foreground">
                   Pedido: {payment.orderId}
                 </p>
 
                 <Button
                   variant="outline"
-                  className="mt-3 w-full"
+                  className="mt-4 w-full"
                   onClick={() => {
                     setPayment(null)
                   }}
@@ -945,6 +1090,7 @@ export function Pricing({
             )}
 
           </div>
+
         </div>
       )}
     </>
