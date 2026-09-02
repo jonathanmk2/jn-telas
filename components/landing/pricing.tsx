@@ -91,15 +91,16 @@ function getNextPriceMessage(
  * VALIDAÇÃO DA QUANTIDADE
  * ============================================================
  *
- * Aceita:
+ * Aceita somente números inteiros de 1 até 500.
+ *
+ * Válidos:
  * 1
- * 2
  * 5
  * 10
  * 100
  * 500
  *
- * Rejeita:
+ * Inválidos:
  * 0
  * 00
  * -1
@@ -137,7 +138,7 @@ export function Pricing({
     useState(false)
 
   /*
-   * Quantidade válida usada nos cálculos.
+   * Quantidade válida utilizada nos cálculos.
    */
   const [quantity, setQuantity] =
     useState(1)
@@ -145,25 +146,15 @@ export function Pricing({
   /*
    * Texto que está dentro do campo.
    *
-   * Mantemos separado de "quantity" para que:
-   *
-   * 5e2
-   * 501
-   * 1.5
-   *
-   * não sejam convertidos automaticamente.
+   * Fica separado de "quantity" para impedir
+   * que valores como "5e2" sejam transformados
+   * automaticamente em 500.
    */
   const [quantityInput, setQuantityInput] =
     useState('1')
 
   /*
-   * Erro visível no card.
-   */
-  const [quantityError, setQuantityError] =
-    useState<string | null>(null)
-
-  /*
-   * Usa o produto de 1 tela como produto base.
+   * Produto de 1 tela como produto base.
    */
   const product =
     products.find(
@@ -171,6 +162,35 @@ export function Pricing({
     ) ??
     products[0] ??
     null
+
+  /*
+   * Quantidade digitada atualmente é válida?
+   */
+  const inputIsValid =
+    isValidQuantityInput(
+      quantityInput,
+    )
+
+  /*
+   * Quantidade válida para os cálculos.
+   */
+  const unitPriceCents =
+    getUnitPriceCents(quantity)
+
+  const totalCents =
+    quantity * unitPriceCents
+
+  const priceLabel =
+    getPriceLabel(quantity)
+
+  const nextPriceMessage =
+    getNextPriceMessage(quantity)
+
+  /*
+   * ============================================================
+   * ALTERAR QUANTIDADE PELOS BOTÕES
+   * ============================================================
+   */
 
   function changeQuantity(value: number) {
     if (!Number.isFinite(value)) {
@@ -189,25 +209,13 @@ export function Pricing({
     setQuantityInput(
       String(newQuantity),
     )
-    setQuantityError(null)
   }
 
-  const inputIsValid =
-    isValidQuantityInput(
-      quantityInput,
-    )
-
-  const unitPriceCents =
-    getUnitPriceCents(quantity)
-
-  const totalCents =
-    quantity * unitPriceCents
-
-  const priceLabel =
-    getPriceLabel(quantity)
-
-  const nextPriceMessage =
-    getNextPriceMessage(quantity)
+  /*
+   * ============================================================
+   * COMPRAR
+   * ============================================================
+   */
 
   function handleBuy() {
     /*
@@ -233,36 +241,32 @@ export function Pricing({
     }
 
     /*
-     * ========================================================
-     * VALIDAÇÃO PRINCIPAL DO CAMPO
-     * ========================================================
+     * IMPORTANTE:
      *
-     * Aqui NÃO usamos Number(quantityInput)
-     * antes da validação.
+     * Validamos o texto ANTES de usar Number().
      *
-     * Portanto:
+     * Assim:
      *
-     * 5e2 -> inválido
-     * 501 -> inválido
-     * 1.5 -> inválido
+     * 5e2  -> inválido
+     * 501  -> inválido
+     * 1.5  -> inválido
+     * -1   -> inválido
+     * 0    -> inválido
      */
     if (
       !isValidQuantityInput(
         quantityInput,
       )
     ) {
-      const message =
-        'Quantidade inválida. Digite um número inteiro entre 1 e 500.'
-
-      setQuantityError(message)
-
-      toast.error(message)
+      toast.error(
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
+      )
 
       return
     }
 
     /*
-     * Só convertemos depois de validar.
+     * Só converte depois da validação.
      */
     const parsedQuantity =
       Number(quantityInput)
@@ -277,25 +281,23 @@ export function Pricing({
       parsedQuantity < 1 ||
       parsedQuantity > 500
     ) {
-      const message =
-        'Quantidade inválida. Digite um número inteiro entre 1 e 500.'
-
-      setQuantityError(message)
-
-      toast.error(message)
+      toast.error(
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
+      )
 
       return
     }
 
     /*
-     * Garante que a quantidade usada
-     * no cálculo seja exatamente a enviada.
+     * Mantém o estado sincronizado.
      */
-    setQuantity(parsedQuantity)
+    setQuantity(
+      parsedQuantity,
+    )
+
     setQuantityInput(
       String(parsedQuantity),
     )
-    setQuantityError(null)
 
     console.log(
       'Iniciando compra:',
@@ -305,7 +307,8 @@ export function Pricing({
         totalCents:
           getUnitPriceCents(
             parsedQuantity,
-          ) * parsedQuantity,
+          ) *
+          parsedQuantity,
       },
     )
 
@@ -365,6 +368,12 @@ export function Pricing({
     })
   }
 
+  /*
+   * ============================================================
+   * COPIAR PIX
+   * ============================================================
+   */
+
   async function copyPixCode() {
     if (!payment?.qrCode) {
       toast.error(
@@ -391,7 +400,7 @@ export function Pricing({
 
   /*
    * ============================================================
-   * VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
+   * VERIFICAR PAGAMENTO AUTOMATICAMENTE
    * ============================================================
    */
 
@@ -412,7 +421,9 @@ export function Pricing({
 
     async function checkPayment() {
       try {
-        setCheckingPayment(true)
+        setCheckingPayment(
+          true,
+        )
 
         const response = await fetch(
           `/api/payment-status?orderId=${payment.orderId}`,
@@ -490,6 +501,7 @@ export function Pricing({
 
     return () => {
       active = false
+
       clearInterval(
         interval,
       )
@@ -498,6 +510,12 @@ export function Pricing({
     payment?.orderId,
     orderStatus,
   ])
+
+  /*
+   * ============================================================
+   * QR CODE
+   * ============================================================
+   */
 
   const qrImage =
     payment?.qrCodeBase64
@@ -523,6 +541,7 @@ export function Pricing({
           {/* CABEÇALHO */}
 
           <div className="mx-auto max-w-2xl text-center">
+
             <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
               LD CLOUD VIP
             </h2>
@@ -530,9 +549,10 @@ export function Pricing({
             <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
               Escolha quantas telas você precisa e pague tudo em um único PIX.
             </p>
+
           </div>
 
-          {/* CARD */}
+          {/* CARD ÚNICO */}
 
           {product && (
             <div className="relative mx-auto mt-12 max-w-xl rounded-2xl border border-primary bg-card p-6 shadow-lg shadow-primary/10 sm:p-8">
@@ -546,6 +566,7 @@ export function Pricing({
               {/* PRODUTO */}
 
               <div className="text-center">
+
                 <h3 className="text-2xl font-bold">
                   LD CLOUD VIP
                 </h3>
@@ -553,12 +574,15 @@ export function Pricing({
                 <p className="mt-2 text-sm text-muted-foreground">
                   Acesso VIP por 30 dias
                 </p>
+
               </div>
 
               {/* PREÇO */}
 
               <div className="mt-8 text-center">
+
                 <div className="flex items-end justify-center gap-2">
+
                   <span className="text-5xl font-bold tracking-tight">
                     {formatBRL(
                       unitPriceCents,
@@ -568,11 +592,13 @@ export function Pricing({
                   <span className="mb-2 text-sm text-muted-foreground">
                     / tela
                   </span>
+
                 </div>
 
                 <p className="mt-2 text-sm font-medium text-primary">
                   {priceLabel}
                 </p>
+
               </div>
 
               {/* QUANTIDADE */}
@@ -618,49 +644,22 @@ export function Pricing({
                         event.target.value
 
                       /*
-                       * Mantém exatamente o que
-                       * foi digitado.
+                       * NÃO usamos Number()
+                       * aqui.
                        *
-                       * 5e2 continua 5e2.
-                       * 501 continua 501.
+                       * Isso mantém:
+                       *
+                       * 5e2
+                       * 501
+                       * 1.5
+                       *
+                       * exatamente como foram digitados.
                        */
                       setQuantityInput(
                         value,
                       )
-
-                      /*
-                       * Limpa erro enquanto
-                       * o usuário corrige.
-                       */
-                      setQuantityError(
-                        null,
-                      )
-
-                      /*
-                       * Só muda "quantity"
-                       * se o valor for válido.
-                       */
-                      if (
-                        isValidQuantityInput(
-                          value,
-                        )
-                      ) {
-                        setQuantity(
-                          Number(value),
-                        )
-                      }
-                    }}
-                    onBlur={() => {
-                      /*
-                       * Não força automaticamente
-                       * um valor inválido para 1.
-                       *
-                       * Mantemos o valor escrito para
-                       * o usuário poder enxergar o erro.
-                       */
                     }}
                     className={`h-12 w-full rounded-lg border bg-background px-3 text-center text-xl font-bold outline-none ${
-                      quantityError ||
                       !inputIsValid
                         ? 'border-red-500 focus:border-red-500'
                         : ''
@@ -695,10 +694,9 @@ export function Pricing({
 
                 </div>
 
-                {/* MENSAGEM DE VALIDAÇÃO */}
+                {/* MENSAGEM */}
 
-                {quantityError ||
-                !inputIsValid ? (
+                {!inputIsValid ? (
                   <p className="mt-2 text-center text-xs font-medium text-red-500">
                     Quantidade inválida. Digite um número inteiro entre 1 e 500.
                   </p>
@@ -833,35 +831,43 @@ export function Pricing({
               <ul className="mt-7 space-y-3">
 
                 <li className="flex items-center gap-3 text-sm">
+
                   <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Telas simultâneas conforme quantidade comprada
                   </span>
+
                 </li>
 
                 <li className="flex items-center gap-3 text-sm">
+
                   <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Acesso VIP por 30 dias
                   </span>
+
                 </li>
 
                 <li className="flex items-center gap-3 text-sm">
+
                   <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Suporte via WhatsApp
                   </span>
+
                 </li>
 
                 <li className="flex items-center gap-3 text-sm">
+
                   <Check className="size-4 shrink-0 text-primary" />
 
                   <span className="text-muted-foreground">
                     Um único pagamento PIX
                   </span>
+
                 </li>
 
               </ul>
@@ -873,7 +879,8 @@ export function Pricing({
                 onClick={handleBuy}
                 disabled={
                   pending ||
-                  !product
+                  !product ||
+                  !inputIsValid
                 }
               >
                 {pending ? (
@@ -884,9 +891,13 @@ export function Pricing({
                 ) : (
                   <>
                     Comprar{' '}
-                    {quantity}{' '}
-                    {quantity === 1
-                      ? 'tela'
+                    {inputIsValid
+                      ? quantity
+                      : '—'}{' '}
+                    {inputIsValid
+                      ? quantity === 1
+                        ? 'tela'
+                        : 'telas'
                       : 'telas'}
                   </>
                 )}
@@ -930,7 +941,9 @@ export function Pricing({
               <div className="py-6 text-center">
 
                 <div className="flex justify-center">
+
                   <CheckCircle2 className="size-20 text-green-500" />
+
                 </div>
 
                 <h2 className="mt-5 text-2xl font-bold">
