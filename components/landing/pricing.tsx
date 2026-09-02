@@ -91,29 +91,36 @@ function getNextPriceMessage(
  * VALIDAÇÃO DA QUANTIDADE
  * ============================================================
  *
- * Aceita somente números inteiros de 1 até 500.
+ * Aceita SOMENTE números inteiros de 1 até 500.
  *
- * Válidos:
+ * Aceita:
  * 1
  * 5
  * 10
+ * 56
  * 100
+ * 499
  * 500
  *
- * Inválidos:
+ * Rejeita:
  * 0
  * 00
  * -1
  * 1.5
  * 5e2
  * 501
+ * 600
+ * 999
+ * 1000
  * abc
  */
 
 function isValidQuantityInput(
   value: string,
 ): boolean {
-  return /^(?:[1-9]\d{0,2}|500)$/.test(value)
+  return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(
+    value,
+  )
 }
 
 export function Pricing({
@@ -138,7 +145,7 @@ export function Pricing({
     useState(false)
 
   /*
-   * Quantidade válida usada nos cálculos.
+   * Quantidade válida utilizada nos cálculos.
    */
   const [quantity, setQuantity] =
     useState(1)
@@ -146,16 +153,14 @@ export function Pricing({
   /*
    * Texto que aparece no campo.
    *
-   * Fica separado de "quantity" para que
-   * valores inválidos como 5e2 e 501
-   * possam aparecer no campo sem serem
-   * convertidos automaticamente.
+   * Mantemos separado de "quantity" para impedir
+   * que 5e2 seja convertido automaticamente para 500.
    */
   const [quantityInput, setQuantityInput] =
     useState('1')
 
   /*
-   * Produto de 1 tela como produto base.
+   * Produto base.
    */
   const product =
     products.find(
@@ -165,7 +170,7 @@ export function Pricing({
     null
 
   /*
-   * Verifica se o texto atual é válido.
+   * Verifica se o texto digitado é válido.
    */
   const inputIsValid =
     isValidQuantityInput(
@@ -173,8 +178,8 @@ export function Pricing({
     )
 
   /*
-   * Preços sempre calculados a partir
-   * da última quantidade válida.
+   * Cálculo baseado somente na última
+   * quantidade válida.
    */
   const unitPriceCents =
     getUnitPriceCents(quantity)
@@ -190,7 +195,7 @@ export function Pricing({
 
   /*
    * ============================================================
-   * ALTERAR QUANTIDADE PELOS BOTÕES
+   * BOTÕES + E -
    * ============================================================
    */
 
@@ -207,11 +212,10 @@ export function Pricing({
       ),
     )
 
-    setQuantity(newQuantity)
+    setQuantity(
+      newQuantity,
+    )
 
-    /*
-     * Mantém o campo sincronizado.
-     */
     setQuantityInput(
       String(newQuantity),
     )
@@ -241,13 +245,17 @@ export function Pricing({
     }
 
     /*
-     * Validação do texto ANTES de Number().
+     * IMPORTANTE:
      *
-     * Isso impede que:
+     * Validamos o TEXTO antes de usar Number().
      *
-     * 5e2 -> 500
+     * Assim:
      *
-     * aconteça.
+     * 5e2 -> inválido
+     * 501 -> inválido
+     * 1.5 -> inválido
+     * -1  -> inválido
+     * 0   -> inválido
      */
     if (
       !isValidQuantityInput(
@@ -262,8 +270,7 @@ export function Pricing({
     }
 
     /*
-     * Só convertemos depois que o texto
-     * passou pela validação.
+     * Só converte depois da validação.
      */
     const parsedQuantity =
       Number(quantityInput)
@@ -284,6 +291,17 @@ export function Pricing({
 
       return
     }
+
+    /*
+     * Mantém o estado sincronizado.
+     */
+    setQuantity(
+      parsedQuantity,
+    )
+
+    setQuantityInput(
+      String(parsedQuantity),
+    )
 
     console.log(
       'Iniciando compra:',
@@ -386,7 +404,7 @@ export function Pricing({
 
   /*
    * ============================================================
-   * VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
+   * VERIFICAÇÃO AUTOMÁTICA DO PAGAMENTO
    * ============================================================
    */
 
@@ -538,7 +556,7 @@ export function Pricing({
 
           </div>
 
-          {/* CARD ÚNICO */}
+          {/* CARD */}
 
           {product && (
             <div className="relative mx-auto mt-12 max-w-xl rounded-2xl border border-primary bg-card p-6 shadow-lg shadow-primary/10 sm:p-8">
@@ -630,22 +648,23 @@ export function Pricing({
                         event.target.value
 
                       /*
-                       * Mantém o texto exatamente
-                       * como foi digitado.
+                       * Mantém exatamente o que
+                       * o usuário digitou.
                        *
+                       * Exemplo:
                        * 5e2 continua 5e2.
                        * 501 continua 501.
                        */
+
                       setQuantityInput(
                         value,
                       )
 
                       /*
-                       * CORREÇÃO PRINCIPAL:
+                       * CORREÇÃO IMPORTANTE:
                        *
-                       * Quando o valor digitado
-                       * for válido, atualizamos
-                       * também "quantity".
+                       * Quando o valor é válido,
+                       * atualizamos "quantity".
                        *
                        * Assim:
                        *
@@ -712,7 +731,7 @@ export function Pricing({
 
               </div>
 
-              {/* DESCONTO POR QUANTIDADE */}
+              {/* FAIXAS DE PREÇO */}
 
               <div className="mt-6 rounded-xl border bg-secondary/40 p-4">
 
@@ -928,6 +947,7 @@ export function Pricing({
               type="button"
               onClick={() => {
                 setPayment(null)
+
                 setOrderStatus(
                   'pending',
                 )
@@ -989,8 +1009,6 @@ export function Pricing({
 
             ) : orderStatus === 'cancelled' ? (
 
-              /* PAGAMENTO CANCELADO */
-
               <div className="py-6 text-center">
 
                 <h2 className="text-2xl font-bold">
@@ -1014,8 +1032,6 @@ export function Pricing({
               </div>
 
             ) : (
-
-              /* AGUARDANDO PAGAMENTO */
 
               <div className="text-center">
 
@@ -1070,8 +1086,6 @@ export function Pricing({
 
                   </>
                 )}
-
-                {/* STATUS AUTOMÁTICO */}
 
                 <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
 
