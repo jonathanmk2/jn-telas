@@ -1,629 +1,522 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import {
-  KeyRound,
-  ShoppingBag,
-  Ticket,
-  Shield,
   ChevronDown,
+  ChevronRight,
+  Copy,
+  KeyRound,
   PackageCheck,
+  ShieldCheck,
+  ShoppingBag,
 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { DashboardNavbar } from '@/components/dashboard/dashboard-navbar'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CopyButton } from '@/components/copy-button'
 import { CopyAllButton } from '@/components/copy-all-button'
-import { StatusBadge } from '@/components/status-badge'
-import { createClient } from '@/lib/supabase/server'
-import { formatBRL, formatDate } from '@/lib/format'
 
-export const dynamic = 'force-dynamic'
-
-type CodeItem = {
+type ActivationCode = {
   id: string
   code: string
-  user_id: string | null
-  order_id: string | null
   status: string
-  assigned_at: string | null
   created_at: string
-  products:
-    | {
-        name: string
-        screens: number
-      }
-    | {
-        name: string
-        screens: number
-      }[]
-    | null
+  assigned_at: string | null
+  order_id: string | null
+  product: {
+    name: string
+  } | null
 }
 
-type OrderItem = {
+type Order = {
   id: string
   status: string
-  quantity: number
   total_cents: number
+  quantity: number
   created_at: string
-  products:
-    | {
-        name: string
-        screens: number
-      }
-    | {
-        name: string
-        screens: number
-      }[]
-    | null
+  product: {
+    name: string
+  } | null
+  activation_codes: {
+    id: string
+    code: string
+    status: string
+    assigned_at: string | null
+  }[]
+}
+
+function formatBRL(cents: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(cents / 100)
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function shortId(id: string) {
+  return id.replaceAll('-', '').slice(0, 8).toUpperCase()
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'delivered':
+      return 'Entregue'
+
+    case 'paid':
+      return 'Pago'
+
+    case 'pending':
+      return 'Aguardando pagamento'
+
+    case 'cancelled':
+    case 'canceled':
+      return 'Cancelado'
+
+    default:
+      return status
+  }
+}
+
+function getStatusClasses(status: string) {
+  switch (status) {
+    case 'delivered':
+    case 'paid':
+      return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+
+    case 'pending':
+      return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+
+    case 'cancelled':
+    case 'canceled':
+      return 'bg-red-500/10 text-red-600 border-red-500/20'
+
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
+}
+
+function normalizeProductName(name: string | null | undefined) {
+  const normalized =
+    name
+      ?.replace(/^\d+\s*Telas?\s*/i, '')
+      ?.replace(/^JN TELAS\s*[-·]?\s*/i, '')
+      ?.trim()
+
+  return normalized || 'LD CLOUD VIP'
 }
 
 export default async function MinhaContaPage() {
-  const supabase = await createClient()
+  const supabase = await createServerSupabaseClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/login?next=/minha-conta')
+    redirect('/login')
   }
 
-  // =====================================================
-  // PERFIL
-  // =====================================================
+  const [{ data: profile }, { data: activationCodes }, { data: orders }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .maybeSingle(),
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, email, is_admin')
-    .eq('id', user.id)
-    .single()
-
-  // =====================================================
-  // CÓDIGOS
-  // =====================================================
-
-  const { data: codes, error: codesError } = await supabase
-    .from('activation_codes')
-    .select(`
-      id,
-      code,
-      user_id,
-      order_id,
-      status,
-      assigned_at,
-      created_at,
-      products (
-        name,
-        screens
-      )
-    `)
-    .eq('user_id', user.id)
-    .order('assigned_at', { ascending: false })
-
-  if (codesError) {
-    console.error('Erro ao buscar códigos:', codesError)
-  }
-
-  // =====================================================
-  // PEDIDOS
-  // =====================================================
-
-  const { data: orders, error: ordersError } =
-    await supabase
-      .from('orders')
-      .select(`
-        id,
-        status,
-        quantity,
-        total_cents,
-        created_at,
-        products (
-          name,
-          screens
+      supabase
+        .from('activation_codes')
+        .select(
+          `
+            id,
+            code,
+            status,
+            created_at,
+            assigned_at,
+            order_id,
+            product:products (
+              name
+            )
+          `,
         )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+        .eq('user_id', user.id)
+        .order('assigned_at', { ascending: false }),
 
-  if (ordersError) {
-    console.error('Erro ao buscar pedidos:', ordersError)
-  }
+      supabase
+        .from('orders')
+        .select(
+          `
+            id,
+            status,
+            total_cents,
+            quantity,
+            created_at,
+            product:products (
+              name
+            ),
+            activation_codes (
+              id,
+              code,
+              status,
+              assigned_at
+            )
+          `,
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+    ])
 
-  const codeList = (codes ?? []) as CodeItem[]
-  const orderList = (orders ?? []) as OrderItem[]
+  const codes = (activationCodes ?? []) as unknown as ActivationCode[]
+  const userOrders = (orders ?? []) as unknown as Order[]
 
-  const firstName = (
-    profile?.full_name ||
-    user.email ||
-    ''
-  ).split(' ')[0]
+  const deliveredCodes = codes.filter(
+    (code) => code.order_id !== null,
+  )
 
-  const activeCodes = codeList.filter(
+  const oldCodes = codes.filter(
+    (code) => code.order_id === null,
+  )
+
+  const totalCodes = codes.length
+
+  const activeCodes = codes.filter(
     (code) => code.status === 'active',
   ).length
 
-  const oldCodes = codeList.filter(
-    (code) => !code.order_id,
-  )
+  const firstName =
+    profile?.full_name?.split(' ')[0] ||
+    user.email?.split('@')[0] ||
+    'Cliente'
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-
-      <DashboardNavbar
-        email={profile?.email ?? user.email ?? null}
-      />
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-6 sm:px-4 sm:py-8">
-
-        {/* ================================================= */}
-        {/* CABEÇALHO */}
-        {/* ================================================= */}
-
-        <div className="flex items-start justify-between gap-3">
-
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-8">
+        {/* HEADER */}
+        <header className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">
+              Minha conta
+            </p>
 
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Minha Conta
+            <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
+              Olá, {firstName} 👋
             </h1>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Olá
-              {firstName ? `, ${firstName}` : ''}! Gerencie seus
-              pedidos e códigos.
-            </p>
-
           </div>
 
-          {/* BOTÕES DO TOPO */}
-
-          <div className="flex shrink-0 gap-2">
-
-            {profile?.is_admin && (
-              <Button
-                asChild
-                variant="secondary"
-                size="sm"
-              >
-                <Link href="/admin">
-                  <Shield className="size-4" />
-                  <span className="hidden sm:inline">
-                    Painel Admin
-                  </span>
-                  <span className="sm:hidden">
-                    Admin
-                  </span>
-                </Link>
-              </Button>
-            )}
-
-            <Button
-              asChild
-              size="sm"
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/"
+              className="hidden rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium transition hover:bg-muted sm:block"
             >
-              <Link href="/#planos">
-                Comprar mais
-              </Link>
-            </Button>
+              Comprar
+            </Link>
 
+            <Link
+              href="/admin"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium transition hover:bg-muted"
+            >
+              Admin
+            </Link>
           </div>
+        </header>
 
-        </div>
-
-        {/* ================================================= */}
         {/* RESUMO */}
-        {/* ================================================= */}
-
-        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
-
-          <SummaryCard
-            icon={Ticket}
-            label="Códigos"
-            value={codeList.length}
-          />
-
-          <SummaryCard
-            icon={KeyRound}
-            label="Ativos"
-            value={activeCodes}
-          />
-
-          <SummaryCard
-            icon={ShoppingBag}
-            label="Pedidos"
-            value={orderList.length}
-          />
-
-        </div>
-
-        {/* ================================================= */}
-        {/* MEUS PEDIDOS */}
-        {/* ================================================= */}
-
-        <section className="mt-9 sm:mt-10">
-
-          <div>
-            <h2 className="text-xl font-bold">
-              Meus Pedidos
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Visualize suas compras e seus códigos.
-            </p>
-          </div>
-
-          {orderList.length === 0 ? (
-
-            <div className="mt-5 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
-
-              <ShoppingBag className="mx-auto size-9 text-muted-foreground" />
-
-              <p className="mt-3 text-sm text-muted-foreground">
-                Nenhum pedido registrado ainda.
-              </p>
-
-              <Button
-                asChild
-                className="mt-5"
-              >
-                <Link href="/#planos">
-                  Ver planos
-                </Link>
-              </Button>
-
+        <section className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <KeyRound className="size-4" />
             </div>
 
+            <p className="text-xl font-bold leading-none sm:text-2xl">
+              {totalCodes}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
+              Códigos
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex size-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+              <ShieldCheck className="size-4" />
+            </div>
+
+            <p className="text-xl font-bold leading-none sm:text-2xl">
+              {activeCodes}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
+              Ativos
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+              <ShoppingBag className="size-4" />
+            </div>
+
+            <p className="text-xl font-bold leading-none sm:text-2xl">
+              {userOrders.length}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
+              Pedidos
+            </p>
+          </div>
+        </section>
+
+        {/* AÇÃO PRINCIPAL */}
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="flex w-full items-center justify-between rounded-2xl border border-primary/20 bg-primary px-4 py-3.5 text-primary-foreground shadow-sm transition hover:opacity-95"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary-foreground/15">
+                <ShoppingBag className="size-4" />
+              </div>
+
+              <div className="text-left">
+                <p className="text-sm font-semibold">
+                  Comprar mais telas
+                </p>
+                <p className="text-xs text-primary-foreground/75">
+                  Adicione novos códigos à sua conta
+                </p>
+              </div>
+            </div>
+
+            <ChevronRight className="size-5" />
+          </Link>
+        </div>
+
+        {/* PEDIDOS */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold sm:text-lg">
+                Meus pedidos
+              </h2>
+
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Seus pedidos e códigos entregues
+              </p>
+            </div>
+
+            <PackageCheck className="size-5 text-muted-foreground" />
+          </div>
+
+          {userOrders.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center">
+              <PackageCheck className="mx-auto mb-3 size-8 text-muted-foreground" />
+
+              <p className="font-semibold">
+                Nenhum pedido ainda
+              </p>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Quando você comprar, seus pedidos aparecerão aqui.
+              </p>
+            </div>
           ) : (
-
-            <div className="mt-5 space-y-3">
-
-              {orderList.map((order) => {
-
-                const product = Array.isArray(
-                  order.products,
-                )
-                  ? order.products[0]
-                  : order.products
-
-                const orderCodes = codeList.filter(
-                  (code) =>
-                    code.order_id === order.id,
-                )
-
-                const shortOrderId =
-                  order.id
-                    .replace(/-/g, '')
-                    .slice(0, 8)
-                    .toUpperCase()
-
+            <div className="space-y-3">
+              {userOrders.map((order) => {
                 const quantity =
-                  Number(order.quantity) ||
-                  orderCodes.length ||
+                  order.quantity ||
+                  order.activation_codes?.length ||
                   1
 
-                const productName =
-                  product?.name
-                    ?.replace(
-                      /^\d+\s*Telas?\s*/i,
-                      '',
-                    )
-                    ?.replace(
-                      /^JN TELAS\s*[-·]?\s*/i,
-                      '',
-                    )
-                    ?.trim() ||
-                  'LD CLOUD VIP'
+                const productName = normalizeProductName(
+                  order.product?.name,
+                )
+
+                const orderCodes = order.activation_codes ?? []
 
                 return (
                   <details
                     key={order.id}
-                    className="group overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm"
+                    className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                   >
+                    <summary className="cursor-pointer list-none p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold tracking-wide">
+                              #{shortId(order.id)}
+                            </span>
 
-                    {/* ================================================= */}
-                    {/* CABEÇALHO DO PEDIDO */}
-                    {/* ================================================= */}
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getStatusClasses(
+                                order.status,
+                              )}`}
+                            >
+                              {getStatusLabel(order.status)}
+                            </span>
 
-                    <summary className="flex cursor-pointer list-none items-center gap-3 p-4 sm:p-5">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {quantity}{' '}
+                              {quantity === 1
+                                ? 'código'
+                                : 'códigos'}
+                            </span>
+                          </div>
 
-                      <div className="min-w-0 flex-1">
-
-                        {/* PEDIDO + STATUS */}
-
-                        <div className="flex flex-wrap items-center gap-2">
-
-                          <span className="text-sm font-bold sm:text-base">
-                            Pedido #{shortOrderId}
-                          </span>
-
-                          <StatusBadge
-                            status={order.status}
-                            type="order"
-                          />
-
-                        </div>
-
-                        {/* QUANTIDADE + DATA */}
-
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
-
-                          <span className="font-medium text-foreground">
-                            {quantity}{' '}
-                            {quantity === 1
-                              ? 'código'
-                              : 'códigos'}
-                          </span>
-
-                          <span>•</span>
-
-                          <span>
-                            {formatDate(
-                              order.created_at,
-                            )}
-                          </span>
-
-                        </div>
-
-                        {/* PRODUTO + VALOR */}
-
-                        <div className="mt-1.5 flex min-w-0 items-center gap-2">
-
-                          <span className="min-w-0 truncate text-xs text-muted-foreground sm:text-sm">
+                          <p className="truncate text-sm font-semibold">
                             {productName} · {quantity}{' '}
-                            {quantity === 1
-                              ? 'tela'
-                              : 'telas'}
-                          </span>
-
-                          <span className="shrink-0 text-sm font-bold sm:text-base">
-                            {formatBRL(
-                              order.total_cents,
-                            )}
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                      {/* ================================================= */}
-                      {/* ABRIR */}
-                      {/* ================================================= */}
-
-                      <div className="flex shrink-0 items-center gap-1">
-
-                        <span className="hidden text-sm font-medium text-primary sm:inline">
-                          Ver códigos
-                        </span>
-
-                        <ChevronDown className="size-5 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
-
-                      </div>
-
-                    </summary>
-
-                    {/* ================================================= */}
-                    {/* CÓDIGOS */}
-                    {/* ================================================= */}
-
-                    <div className="border-t border-border/60 bg-background/20 p-3 sm:p-4">
-
-                      {orderCodes.length === 0 ? (
-
-                        <div className="rounded-xl border border-dashed border-border p-6 text-center">
-
-                          <p className="text-sm text-muted-foreground">
-                            {order.status === 'delivered'
-                              ? 'Os códigos deste pedido ainda estão sendo organizados.'
-                              : 'Os códigos aparecerão aqui após a confirmação e entrega do pedido.'}
+                            {quantity === 1 ? 'tela' : 'telas'}
                           </p>
 
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span>
+                              {formatDate(order.created_at)}
+                            </span>
+
+                            <span>•</span>
+
+                            <span className="font-medium text-foreground">
+                              {formatBRL(order.total_cents)}
+                            </span>
+                          </div>
                         </div>
 
-                      ) : (
+                        <div className="flex shrink-0 items-center gap-2 pt-1">
+                          <span className="hidden text-xs font-medium text-muted-foreground sm:block">
+                            Ver códigos
+                          </span>
 
-                        <div>
+                          <ChevronDown className="size-5 text-muted-foreground transition-transform group-open:rotate-180" />
+                        </div>
+                      </div>
+                    </summary>
 
-                          {/* ================================================= */}
-                          {/* TÍTULO + COPIAR TODOS */}
-                          {/* ================================================= */}
+                    {/* CÓDIGOS DO PEDIDO */}
+                    <div className="border-t border-border bg-muted/20 p-3 sm:p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <KeyRound className="size-4" />
+                          </div>
 
-                          <div className="mb-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">
+                              Códigos deste pedido
+                            </p>
 
-                            <div className="flex min-w-0 items-center gap-2">
+                            <p className="text-[11px] text-muted-foreground">
+                              {orderCodes.length}{' '}
+                              {orderCodes.length === 1
+                                ? 'código'
+                                : 'códigos'}
+                            </p>
+                          </div>
+                        </div>
 
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                <PackageCheck className="size-4 text-primary" />
-                              </div>
-
-                              <div className="min-w-0">
-
-                                <p className="text-sm font-semibold">
-                                  Códigos deste pedido
-                                </p>
-
-                                <p className="text-xs text-muted-foreground">
-                                  {orderCodes.length}{' '}
-                                  {orderCodes.length === 1
-                                    ? 'código'
-                                    : 'códigos'}
-                                </p>
-
-                              </div>
-
-                            </div>
-
+                        {orderCodes.length > 0 && (
+                          <div className="shrink-0">
                             <CopyAllButton
                               codes={orderCodes.map(
-                                (code) =>
-                                  code.code,
+                                (item) => item.code,
                               )}
                             />
-
                           </div>
+                        )}
+                      </div>
 
-                          {/* ================================================= */}
-                          {/* LISTA DE CÓDIGOS */}
-                          {/* ================================================= */}
-
-                          <div className="space-y-2">
-
-                            {orderCodes.map(
-                              (code) => (
-                                <div
-                                  key={code.id}
-                                  className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-2.5 sm:p-3"
-                                >
-
-                                  <code className="min-w-0 flex-1 truncate rounded-lg bg-secondary px-2.5 py-2 font-mono text-xs font-medium sm:text-sm">
-                                    {code.code}
-                                  </code>
-
-                                  <StatusBadge
-                                    status={
-                                      code.status
-                                    }
-                                    type="code"
-                                  />
-
-                                  <CopyButton
-                                    value={
-                                      code.code
-                                    }
-                                    className="size-9 shrink-0 px-2"
-                                  />
-
-                                </div>
-                              ),
-                            )}
-
-                          </div>
-
+                      {orderCodes.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border bg-background p-4 text-center text-sm text-muted-foreground">
+                          Os códigos deste pedido ainda não
+                          foram vinculados.
                         </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {orderCodes.map((item) => (
+                            <div
+                              key={item.id}
+                              className="rounded-xl border border-border bg-background p-3"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* CÓDIGO */}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-mono text-sm font-semibold tracking-wide">
+                                    {item.code}
+                                  </p>
+                                </div>
 
+                                {/* STATUS + COPIAR */}
+                                <div className="flex shrink-0 items-center gap-4">
+                                  <span className="whitespace-nowrap text-[10px] font-semibold text-emerald-600">
+                                    Ativo
+                                  </span>
+
+                                  <CopyButton code={item.code} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
-
                     </div>
-
                   </details>
                 )
               })}
-
             </div>
-
           )}
-
         </section>
 
-        {/* ================================================= */}
-        {/* OUTROS CÓDIGOS */}
-        {/* ================================================= */}
-
+        {/* CÓDIGOS ANTIGOS */}
         {oldCodes.length > 0 && (
+          <section className="mt-7">
+            <div className="mb-3">
+              <h2 className="text-base font-bold sm:text-lg">
+                Outros códigos
+              </h2>
 
-          <section className="mt-9">
-
-            <h2 className="text-xl font-bold">
-              Outros Códigos
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Códigos adquiridos antes da organização por pedidos.
-            </p>
-
-            <div className="mt-4 space-y-2">
-
-              {oldCodes.map((code) => {
-
-                const product =
-                  Array.isArray(code.products)
-                    ? code.products[0]
-                    : code.products
-
-                return (
-                  <div
-                    key={code.id}
-                    className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3"
-                  >
-
-                    <div className="min-w-0 flex-1">
-
-                      <div className="flex min-w-0 items-center gap-2">
-
-                        <code className="min-w-0 flex-1 truncate rounded-lg bg-secondary px-2.5 py-2 font-mono text-xs sm:text-sm">
-                          {code.code}
-                        </code>
-
-                        <StatusBadge
-                          status={code.status}
-                          type="code"
-                        />
-
-                      </div>
-
-                      <p className="mt-1.5 truncate text-[11px] text-muted-foreground sm:text-xs">
-                        {product?.name ?? 'Plano'} · Adquirido em{' '}
-                        {formatDate(
-                          code.assigned_at ??
-                            code.created_at,
-                        )}
-                      </p>
-
-                    </div>
-
-                    <CopyButton
-                      value={code.code}
-                      className="size-9 shrink-0 px-2"
-                    />
-
-                  </div>
-                )
-              })}
-
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Códigos adicionados anteriormente
+              </p>
             </div>
 
-          </section>
+            <div className="space-y-2">
+              {oldCodes.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-border bg-card p-3 shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-sm font-semibold">
+                        {item.code}
+                      </p>
+                    </div>
 
+                    <div className="flex shrink-0 items-center gap-4">
+                      <span className="whitespace-nowrap text-[10px] font-semibold text-emerald-600">
+                        Ativo
+                      </span>
+
+                      <CopyButton code={item.code} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
-      </main>
-    </div>
-  )
-}
-
-// =====================================================
-// CARD DE RESUMO
-// =====================================================
-
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{
-    className?: string
-  }>
-  label: string
-  value: number
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border/60 bg-card px-2.5 py-3 sm:gap-4 sm:p-4">
-
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-11">
-        <Icon className="size-4 sm:size-5" />
+        {/* RODAPÉ */}
+        <footer className="mt-8 border-t border-border pt-5 text-center">
+          <p className="text-[11px] text-muted-foreground">
+            Seus códigos ficam vinculados à sua conta.
+          </p>
+        </footer>
       </div>
-
-      <div className="min-w-0">
-
-        <p className="text-xl font-bold leading-none sm:text-2xl">
-          {value}
-        </p>
-
-        <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-sm">
-          {label}
-        </p>
-
-      </div>
-
-    </div>
+    </main>
   )
 }
