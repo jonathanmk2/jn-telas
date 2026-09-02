@@ -138,17 +138,18 @@ export function Pricing({
     useState(false)
 
   /*
-   * Quantidade válida utilizada nos cálculos.
+   * Quantidade válida usada nos cálculos.
    */
   const [quantity, setQuantity] =
     useState(1)
 
   /*
-   * Texto que está dentro do campo.
+   * Texto que aparece no campo.
    *
-   * Fica separado de "quantity" para impedir
-   * que valores como "5e2" sejam transformados
-   * automaticamente em 500.
+   * Fica separado de "quantity" para que
+   * valores inválidos como 5e2 e 501
+   * possam aparecer no campo sem serem
+   * convertidos automaticamente.
    */
   const [quantityInput, setQuantityInput] =
     useState('1')
@@ -164,7 +165,7 @@ export function Pricing({
     null
 
   /*
-   * Quantidade digitada atualmente é válida?
+   * Verifica se o texto atual é válido.
    */
   const inputIsValid =
     isValidQuantityInput(
@@ -172,7 +173,8 @@ export function Pricing({
     )
 
   /*
-   * Quantidade válida para os cálculos.
+   * Preços sempre calculados a partir
+   * da última quantidade válida.
    */
   const unitPriceCents =
     getUnitPriceCents(quantity)
@@ -206,6 +208,10 @@ export function Pricing({
     )
 
     setQuantity(newQuantity)
+
+    /*
+     * Mantém o campo sincronizado.
+     */
     setQuantityInput(
       String(newQuantity),
     )
@@ -218,9 +224,6 @@ export function Pricing({
    */
 
   function handleBuy() {
-    /*
-     * Produto inexistente.
-     */
     if (!product) {
       toast.error(
         'Produto não encontrado.',
@@ -229,9 +232,6 @@ export function Pricing({
       return
     }
 
-    /*
-     * Usuário não logado.
-     */
     if (!isLoggedIn) {
       router.push(
         '/auth/sign-up?next=/minha-conta',
@@ -241,17 +241,13 @@ export function Pricing({
     }
 
     /*
-     * IMPORTANTE:
+     * Validação do texto ANTES de Number().
      *
-     * Validamos o texto ANTES de usar Number().
+     * Isso impede que:
      *
-     * Assim:
+     * 5e2 -> 500
      *
-     * 5e2  -> inválido
-     * 501  -> inválido
-     * 1.5  -> inválido
-     * -1   -> inválido
-     * 0    -> inválido
+     * aconteça.
      */
     if (
       !isValidQuantityInput(
@@ -266,7 +262,8 @@ export function Pricing({
     }
 
     /*
-     * Só converte depois da validação.
+     * Só convertemos depois que o texto
+     * passou pela validação.
      */
     const parsedQuantity =
       Number(quantityInput)
@@ -287,17 +284,6 @@ export function Pricing({
 
       return
     }
-
-    /*
-     * Mantém o estado sincronizado.
-     */
-    setQuantity(
-      parsedQuantity,
-    )
-
-    setQuantityInput(
-      String(parsedQuantity),
-    )
 
     console.log(
       'Iniciando compra:',
@@ -400,7 +386,7 @@ export function Pricing({
 
   /*
    * ============================================================
-   * VERIFICAR PAGAMENTO AUTOMATICAMENTE
+   * VERIFICA STATUS DO PAGAMENTO AUTOMATICAMENTE
    * ============================================================
    */
 
@@ -644,20 +630,38 @@ export function Pricing({
                         event.target.value
 
                       /*
-                       * NÃO usamos Number()
-                       * aqui.
+                       * Mantém o texto exatamente
+                       * como foi digitado.
                        *
-                       * Isso mantém:
-                       *
-                       * 5e2
-                       * 501
-                       * 1.5
-                       *
-                       * exatamente como foram digitados.
+                       * 5e2 continua 5e2.
+                       * 501 continua 501.
                        */
                       setQuantityInput(
                         value,
                       )
+
+                      /*
+                       * CORREÇÃO PRINCIPAL:
+                       *
+                       * Quando o valor digitado
+                       * for válido, atualizamos
+                       * também "quantity".
+                       *
+                       * Assim:
+                       *
+                       * 56 -> quantity = 56
+                       * 100 -> quantity = 100
+                       * 500 -> quantity = 500
+                       */
+                      if (
+                        isValidQuantityInput(
+                          value,
+                        )
+                      ) {
+                        setQuantity(
+                          Number(value),
+                        )
+                      }
                     }}
                     className={`h-12 w-full rounded-lg border bg-background px-3 text-center text-xl font-bold outline-none ${
                       !inputIsValid
@@ -694,7 +698,7 @@ export function Pricing({
 
                 </div>
 
-                {/* MENSAGEM */}
+                {/* MENSAGEM DE VALIDAÇÃO */}
 
                 {!inputIsValid ? (
                   <p className="mt-2 text-center text-xs font-medium text-red-500">
