@@ -11,9 +11,7 @@ export async function POST(request: NextRequest) {
       process.env.MERCADO_PAGO_ACCESS_TOKEN
 
     if (!mercadoPagoToken) {
-      console.error(
-        'Token do Mercado Pago não configurado.',
-      )
+      console.error('Token do Mercado Pago não configurado.')
 
       return NextResponse.json(
         {
@@ -57,9 +55,7 @@ export async function POST(request: NextRequest) {
         notificationId = String(body.data.id)
       }
     } catch {
-      console.log(
-        'Webhook sem JSON no body.',
-      )
+      console.log('Webhook sem JSON no body.')
     }
 
     console.log('Tipo recebido:', type)
@@ -70,9 +66,7 @@ export async function POST(request: NextRequest) {
     // =====================================================
 
     if (!notificationId) {
-      console.log(
-        'Notificação sem ID. Ignorada.',
-      )
+      console.log('Notificação sem ID. Ignorada.')
 
       return NextResponse.json({
         ok: true,
@@ -330,7 +324,9 @@ async function processPayment({
     )
 
     // =====================================================
-    // BUSCA PEDIDO + PRODUTO
+    // BUSCA PEDIDO
+    //
+    // AGORA BUSCAMOS quantity DIRETAMENTE DO PEDIDO
     // =====================================================
 
     const {
@@ -342,6 +338,7 @@ async function processPayment({
         id,
         user_id,
         product_id,
+        quantity,
         status,
         activation_code_id,
         products (
@@ -373,25 +370,27 @@ async function processPayment({
     )
 
     // =====================================================
-    // DESCOBRE QUANTOS CÓDIGOS ENTREGAR
+    // QUANTIDADE COMPRADA
+    //
+    // IMPORTANTE:
+    // NÃO USAMOS MAIS product.screens
+    //
+    // A quantidade vem de orders.quantity
     // =====================================================
 
-    const product = Array.isArray(order.products)
-      ? order.products[0]
-      : order.products
-
     const quantity =
-      Number(product?.screens) || 1
+      Number(order.quantity) || 1
 
     console.log('=================================')
-    console.log('PRODUTO COMPRADO')
     console.log(
-      'Produto:',
-      product?.name ?? 'Desconhecido',
+      'QUANTIDADE COMPRADA:',
+      quantity,
     )
     console.log(
-      'Quantidade de códigos:',
-      quantity,
+      'Produto:',
+      Array.isArray(order.products)
+        ? order.products[0]?.name ?? 'Desconhecido'
+        : order.products?.name ?? 'Desconhecido',
     )
     console.log('=================================')
 
@@ -435,8 +434,10 @@ async function processPayment({
       // MARCA COMO PAGO
       // ===================================================
 
-      const { error: paidError } =
-        await admin
+      if (order.status !== 'paid') {
+        const {
+          error: paidError,
+        } = await admin
           .from('orders')
           .update({
             status: 'paid',
@@ -446,24 +447,26 @@ async function processPayment({
           })
           .eq('id', order.id)
 
-      if (paidError) {
-        console.error(
-          'Erro ao marcar pedido como pago:',
-          paidError,
+        if (paidError) {
+          console.error(
+            'Erro ao marcar pedido como pago:',
+            paidError,
+          )
+
+          return
+        }
+
+        console.log(
+          'Pedido marcado como PAID.',
         )
-
-        return
+      } else {
+        console.log(
+          'Pedido já estava marcado como PAID.',
+        )
       }
-
-      console.log(
-        'Pedido marcado como PAID.',
-      )
 
       // ===================================================
       // PROCURA CÓDIGOS NO ESTOQUE ÚNICO
-      //
-      // IMPORTANTE:
-      // NÃO FILTRA product_id.
       //
       // TODOS OS PRODUTOS USAM O MESMO ESTOQUE.
       // ===================================================
@@ -525,8 +528,8 @@ async function processPayment({
         )
         console.error('=================================')
 
-        // Pedido permanece PAID.
-        // Não marca como DELIVERED.
+        // Continua PAID.
+        // NÃO marca como DELIVERED.
         return
       }
 
@@ -543,14 +546,7 @@ async function processPayment({
         new Date().toISOString()
 
       // ===================================================
-      // ATRIBUI OS CÓDIGOS
-      //
-      // IMPORTANTE:
-      //
-      // user_id  = dono dos códigos
-      // order_id = pedido específico
-      //
-      // Isso permite separar os códigos por compra.
+      // ATRIBUI TODOS OS CÓDIGOS
       // ===================================================
 
       const {
@@ -624,6 +620,10 @@ async function processPayment({
 
       // ===================================================
       // MARCA PEDIDO COMO ENTREGUE
+      //
+      // activation_code_id continua recebendo o PRIMEIRO
+      // código para manter compatibilidade com pedidos
+      // antigos e com o restante do sistema.
       // ===================================================
 
       const {
@@ -683,14 +683,15 @@ async function processPayment({
         normalizedStatus,
       )
 
-      const { error } =
-        await admin
-          .from('orders')
-          .update({
-            status: 'cancelled',
-            payment_id: paymentId,
-          })
-          .eq('id', order.id)
+      const {
+        error,
+      } = await admin
+        .from('orders')
+        .update({
+          status: 'cancelled',
+          payment_id: paymentId,
+        })
+        .eq('id', order.id)
 
       if (error) {
         console.error(
