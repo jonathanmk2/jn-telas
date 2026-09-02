@@ -135,13 +135,13 @@ export function SiteNavbar({ user }: { user: NavUser }) {
             aria-label="Navegação mobile"
           >
             {/* Links principais */}
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               {links.map((l) => (
                 <a
                   key={l.href}
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="flex min-h-10 w-full items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 >
                   {l.label}
                 </a>
@@ -152,73 +152,55 @@ export function SiteNavbar({ user }: { user: NavUser }) {
             <div className="mt-2 border-t border-border/60 pt-3">
               {user ? (
                 <div className="flex flex-col gap-2">
-                  {/* Admin */}
+                  {/* ADMIN */}
                   {user.isAdmin && (
-                    <Button
-                      asChild
-                      className="h-10 w-full justify-start rounded-lg bg-primary font-semibold text-primary-foreground shadow-sm"
+                    <Link
+                      href="/admin"
+                      onClick={() => setOpen(false)}
+                      className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-transform active:scale-[0.98]"
                     >
-                      <Link
-                        href="/admin"
-                        onClick={() => setOpen(false)}
-                      >
-                        <Shield className="size-5" />
-                        Admin
-                      </Link>
-                    </Button>
+                      <Shield className="size-5 shrink-0" />
+                      <span>Admin</span>
+                    </Link>
                   )}
 
-                  {/* Minha Conta */}
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="h-10 w-full justify-start rounded-lg font-semibold"
+                  {/* MINHA CONTA */}
+                  <Link
+                    href="/minha-conta"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-secondary px-4 text-sm font-semibold text-foreground shadow-sm transition-transform active:scale-[0.98]"
                   >
-                    <Link
-                      href="/minha-conta"
-                      onClick={() => setOpen(false)}
-                    >
-                      <LayoutDashboard className="size-5" />
-                      Minha Conta
-                    </Link>
-                  </Button>
+                    <LayoutDashboard className="size-5 shrink-0" />
+                    <span>Minha Conta</span>
+                  </Link>
 
-                  {/* Sair */}
-                  <Button
-                    variant="ghost"
-                    className="h-9 w-full justify-start rounded-lg text-muted-foreground"
+                  {/* SAIR */}
+                  <button
+                    type="button"
                     onClick={handleLogout}
+                    className="flex min-h-10 w-full items-center gap-3 rounded-xl px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   >
-                    <LogOut className="size-4" />
-                    Sair
-                  </Button>
+                    <LogOut className="size-4 shrink-0" />
+                    <span>Sair</span>
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="h-10"
+                  <Link
+                    href="/auth/login"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-10 w-full items-center justify-center rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-secondary"
                   >
-                    <Link
-                      href="/auth/login"
-                      onClick={() => setOpen(false)}
-                    >
-                      Entrar
-                    </Link>
-                  </Button>
+                    Entrar
+                  </Link>
 
-                  <Button
-                    asChild
-                    className="h-10"
+                  <Link
+                    href="/auth/sign-up"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-10 w-full items-center justify-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
                   >
-                    <Link
-                      href="/auth/sign-up"
-                      onClick={() => setOpen(false)}
-                    >
-                      Criar Conta
-                    </Link>
-                  </Button>
+                    Criar Conta
+                  </Link>
                 </div>
               )}
             </div>
