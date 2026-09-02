@@ -90,13 +90,15 @@ export default async function HomePage() {
 
       <main className="flex-1">
         <Hero />
-        <Benefits />
 
+        {/* CARD DE VENDA — MANTIDO ORIGINAL */}
         <Pricing
           products={products}
           isLoggedIn={!!user}
         />
 
+        {/* DEMAIS INFORMAÇÕES ABAIXO */}
+        <Benefits />
         <Faq />
         <Support />
       </main>
