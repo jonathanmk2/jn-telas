@@ -18,8 +18,28 @@ type BuyResult =
       needsAuth?: boolean
     }
 
+/*
+ * REGRA DE PREÇO
+ *
+ * 1 a 4 telas  = R$ 35,00 cada
+ * 5 a 9 telas  = R$ 34,00 cada
+ * 10+ telas    = R$ 33,00 cada
+ */
+function getUnitPriceCents(quantity: number): number {
+  if (quantity >= 10) {
+    return 3300
+  }
+
+  if (quantity >= 5) {
+    return 3400
+  }
+
+  return 3500
+}
+
 export async function createOrder(
   productId: string,
+  quantity: number = 1,
 ): Promise<BuyResult> {
   try {
     // =====================================================
@@ -73,13 +93,29 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 3. CLIENTE ADMIN
+    // 3. VALIDA QUANTIDADE
+    // =====================================================
+
+    if (
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 500
+    ) {
+      return {
+        ok: false,
+        error:
+          'A quantidade deve estar entre 1 e 500 telas.',
+      }
+    }
+
+    // =====================================================
+    // 4. CLIENTE ADMIN
     // =====================================================
 
     const admin = createAdminClient()
 
     // =====================================================
-    // 4. CONVERTE O PLANO PARA NÚMERO DE TELAS
+    // 5. CONVERTE O PLANO PARA NÚMERO DE TELAS
     // =====================================================
 
     const plans: Record<string, number> = {
@@ -107,11 +143,12 @@ export async function createOrder(
     console.log('INICIANDO COMPRA - PRODUÇÃO')
     console.log('Usuário:', user.id)
     console.log('Plano recebido:', productId)
-    console.log('Quantidade de telas:', screens)
+    console.log('Quantidade solicitada:', quantity)
+    console.log('Plano base:', screens)
     console.log('=================================')
 
     // =====================================================
-    // 5. BUSCA O PRODUTO
+    // 6. BUSCA O PRODUTO
     // =====================================================
 
     const {
@@ -146,7 +183,33 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 6. CRIA O PEDIDO NO BANCO
+    // 7. CALCULA PREÇO
+    // =====================================================
+
+    const unitPriceCents =
+      getUnitPriceCents(quantity)
+
+    const totalCents =
+      unitPriceCents * quantity
+
+    const amount =
+      (totalCents / 100).toFixed(2)
+
+    console.log('=================================')
+    console.log('CÁLCULO DA COMPRA')
+    console.log('Quantidade:', quantity)
+    console.log(
+      'Preço unitário:',
+      (unitPriceCents / 100).toFixed(2),
+    )
+    console.log(
+      'Total:',
+      amount,
+    )
+    console.log('=================================')
+
+    // =====================================================
+    // 8. CRIA O PEDIDO NO BANCO
     // =====================================================
 
     const {
@@ -157,8 +220,9 @@ export async function createOrder(
       .insert({
         user_id: user.id,
         product_id: product.id,
+        quantity,
         status: 'pending',
-        total_cents: product.price_cents,
+        total_cents: totalCents,
       })
       .select('id')
       .single()
@@ -181,23 +245,7 @@ export async function createOrder(
     console.log('Pedido criado:', order.id)
 
     // =====================================================
-    // 7. CONVERTE CENTAVOS PARA REAIS
-    // =====================================================
-
-    const amount = (
-      product.price_cents / 100
-    ).toFixed(2)
-
-    console.log('=================================')
-    console.log('CRIANDO PIX - PRODUÇÃO')
-    console.log('Produto:', product.name)
-    console.log('Telas:', product.screens)
-    console.log('Valor:', amount)
-    console.log('Pedido:', order.id)
-    console.log('=================================')
-
-    // =====================================================
-    // 8. MONTA O PEDIDO DO MERCADO PAGO
+    // 9. MONTA O PEDIDO DO MERCADO PAGO
     // =====================================================
 
     const mercadoPagoBody = {
@@ -209,7 +257,10 @@ export async function createOrder(
 
       total_amount: amount,
 
-      description: product.name,
+      description:
+        quantity === 1
+          ? product.name
+          : `${quantity} telas - ${product.name}`,
 
       payer: {
         email: user.email ?? undefined,
@@ -229,8 +280,16 @@ export async function createOrder(
       },
     }
 
+    console.log('=================================')
+    console.log('CRIANDO PIX - PRODUÇÃO')
+    console.log('Produto:', product.name)
+    console.log('Quantidade:', quantity)
+    console.log('Valor:', amount)
+    console.log('Pedido:', order.id)
+    console.log('=================================')
+
     // =====================================================
-    // 9. HEADERS
+    // 10. HEADERS
     // =====================================================
 
     const headers: Record<string, string> = {
@@ -245,7 +304,7 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 10. ENVIA PARA O MERCADO PAGO
+    // 11. ENVIA PARA O MERCADO PAGO
     // =====================================================
 
     const response = await fetch(
@@ -253,21 +312,27 @@ export async function createOrder(
       {
         method: 'POST',
         headers,
-        body: JSON.stringify(mercadoPagoBody),
+        body: JSON.stringify(
+          mercadoPagoBody,
+        ),
         cache: 'no-store',
       },
     )
 
-    const responseText = await response.text()
+    const responseText =
+      await response.text()
 
     console.log('=================================')
     console.log('RESPOSTA MERCADO PAGO')
     console.log('Status:', response.status)
-    console.log('Resposta:', responseText)
+    console.log(
+      'Resposta:',
+      responseText,
+    )
     console.log('=================================')
 
     // =====================================================
-    // 11. ERRO DO MERCADO PAGO
+    // 12. ERRO DO MERCADO PAGO
     // =====================================================
 
     if (!response.ok) {
@@ -291,7 +356,7 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 12. CONVERTE RESPOSTA PARA JSON
+    // 13. CONVERTE RESPOSTA PARA JSON
     // =====================================================
 
     let mercadoPagoOrder: any
@@ -313,28 +378,30 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 13. ID DO PEDIDO MERCADO PAGO
+    // 14. ID DO PEDIDO MERCADO PAGO
     // =====================================================
 
-    const mercadoPagoOrderId = String(
-      mercadoPagoOrder.id ??
-        mercadoPagoOrder.order_id ??
-        '',
-    )
+    const mercadoPagoOrderId =
+      String(
+        mercadoPagoOrder.id ??
+          mercadoPagoOrder.order_id ??
+          '',
+      )
 
     // =====================================================
-    // 14. SALVA ID NO BANCO
+    // 15. SALVA ID NO BANCO
     // =====================================================
 
     if (mercadoPagoOrderId) {
-      const { error: updateError } =
-        await admin
-          .from('orders')
-          .update({
-            payment_preference_id:
-              mercadoPagoOrderId,
-          })
-          .eq('id', order.id)
+      const {
+        error: updateError,
+      } = await admin
+        .from('orders')
+        .update({
+          payment_preference_id:
+            mercadoPagoOrderId,
+        })
+        .eq('id', order.id)
 
       if (updateError) {
         console.error(
@@ -345,7 +412,7 @@ export async function createOrder(
     }
 
     // =====================================================
-    // 15. PROCURA OS DADOS DO PIX
+    // 16. PROCURA OS DADOS DO PIX
     // =====================================================
 
     const transaction =
@@ -357,34 +424,58 @@ export async function createOrder(
       null
 
     const qrCode =
-      transaction?.payment_method?.qr_code ??
+      transaction?.payment_method
+        ?.qr_code ??
       transaction?.qr_code ??
-      transaction?.point_of_interaction
-        ?.transaction_data?.qr_code ??
+      transaction
+        ?.point_of_interaction
+        ?.transaction_data
+        ?.qr_code ??
       mercadoPagoOrder.qr_code ??
-      mercadoPagoOrder.point_of_interaction
-        ?.transaction_data?.qr_code ??
+      mercadoPagoOrder
+        .point_of_interaction
+        ?.transaction_data
+        ?.qr_code ??
       null
 
     const qrCodeBase64 =
-      transaction?.payment_method
+      transaction
+        ?.payment_method
         ?.qr_code_base64 ??
       transaction?.qr_code_base64 ??
-      transaction?.point_of_interaction
-        ?.transaction_data?.qr_code_base64 ??
+      transaction
+        ?.point_of_interaction
+        ?.transaction_data
+        ?.qr_code_base64 ??
       mercadoPagoOrder.qr_code_base64 ??
-      mercadoPagoOrder.point_of_interaction
-        ?.transaction_data?.qr_code_base64 ??
+      mercadoPagoOrder
+        .point_of_interaction
+        ?.transaction_data
+        ?.qr_code_base64 ??
       null
 
     console.log('=================================')
     console.log('PIX CRIADO COM SUCESSO')
-    console.log('Pedido interno:', order.id)
+    console.log(
+      'Pedido interno:',
+      order.id,
+    )
     console.log(
       'Pedido Mercado Pago:',
       mercadoPagoOrderId,
     )
-    console.log('Tem QR Code:', !!qrCode)
+    console.log(
+      'Quantidade:',
+      quantity,
+    )
+    console.log(
+      'Total:',
+      amount,
+    )
+    console.log(
+      'Tem QR Code:',
+      !!qrCode,
+    )
     console.log(
       'Tem QR Base64:',
       !!qrCodeBase64,
@@ -392,7 +483,7 @@ export async function createOrder(
     console.log('=================================')
 
     // =====================================================
-    // 16. RETORNA PARA O SITE
+    // 17. RETORNA PARA O SITE
     // =====================================================
 
     return {
