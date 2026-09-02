@@ -3,8 +3,12 @@ import { redirect } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
+  Home,
   KeyRound,
+  LayoutDashboard,
+  LogOut,
   PackageCheck,
+  Shield,
   ShieldCheck,
   ShoppingBag,
 } from 'lucide-react'
@@ -118,58 +122,61 @@ export default async function MinhaContaPage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/login')
+    redirect('/auth/login?next=/minha-conta')
   }
 
-  const [{ data: profile }, { data: activationCodes }, { data: orders }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', user.id)
-        .maybeSingle(),
+  const [
+    { data: profile },
+    { data: activationCodes },
+    { data: orders },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name, email, is_admin')
+      .eq('id', user.id)
+      .maybeSingle(),
 
-      supabase
-        .from('activation_codes')
-        .select(
-          `
+    supabase
+      .from('activation_codes')
+      .select(
+        `
+          id,
+          code,
+          status,
+          created_at,
+          assigned_at,
+          order_id,
+          product:products (
+            name
+          )
+        `,
+      )
+      .eq('user_id', user.id)
+      .order('assigned_at', { ascending: false }),
+
+    supabase
+      .from('orders')
+      .select(
+        `
+          id,
+          status,
+          total_cents,
+          quantity,
+          created_at,
+          product:products (
+            name
+          ),
+          activation_codes (
             id,
             code,
             status,
-            created_at,
-            assigned_at,
-            order_id,
-            product:products (
-              name
-            )
-          `,
-        )
-        .eq('user_id', user.id)
-        .order('assigned_at', { ascending: false }),
-
-      supabase
-        .from('orders')
-        .select(
-          `
-            id,
-            status,
-            total_cents,
-            quantity,
-            created_at,
-            product:products (
-              name
-            ),
-            activation_codes (
-              id,
-              code,
-              status,
-              assigned_at
-            )
-          `,
-        )
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false }),
-    ])
+            assigned_at
+          )
+        `,
+      )
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+  ])
 
   const codes = (activationCodes ?? []) as unknown as ActivationCode[]
   const userOrders = (orders ?? []) as unknown as Order[]
@@ -184,6 +191,8 @@ export default async function MinhaContaPage() {
     (code) => code.status === 'active',
   ).length
 
+  const isAdmin = profile?.is_admin === true
+
   const firstName =
     profile?.full_name?.split(' ')[0] ||
     user.email?.split('@')[0] ||
@@ -192,6 +201,7 @@ export default async function MinhaContaPage() {
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-8">
+
         {/* HEADER */}
         <header className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -204,25 +214,41 @@ export default async function MinhaContaPage() {
             </h1>
           </div>
 
+          {/* BOTÕES DO TOPO */}
           <div className="flex shrink-0 items-center gap-2">
+
+            {/* HOME */}
             <Link
               href="/"
-              className="hidden rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium transition hover:bg-muted sm:block"
+              aria-label="Voltar para Home"
+              className="flex size-10 items-center justify-center rounded-xl border border-border bg-background font-medium transition hover:bg-muted sm:size-auto sm:px-3 sm:py-2"
             >
-              Comprar
+              <Home className="size-4 sm:mr-2" />
+
+              <span className="hidden text-sm sm:inline">
+                Home
+              </span>
             </Link>
 
-            <Link
-              href="/admin"
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium transition hover:bg-muted"
-            >
-              Admin
-            </Link>
+            {/* ADMIN — SOMENTE ADMINISTRADORES */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="flex size-10 items-center justify-center rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 sm:h-auto sm:w-auto sm:px-3 sm:py-2"
+              >
+                <Shield className="size-4 sm:mr-2" />
+
+                <span className="hidden text-sm sm:inline">
+                  Admin
+                </span>
+              </Link>
+            )}
           </div>
         </header>
 
         {/* RESUMO */}
         <section className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
+
           <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
             <div className="mb-2 flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <KeyRound className="size-4" />
@@ -332,7 +358,8 @@ export default async function MinhaContaPage() {
                   order.product?.name,
                 )
 
-                const orderCodes = order.activation_codes ?? []
+                const orderCodes =
+                  order.activation_codes ?? []
 
                 return (
                   <details
@@ -341,8 +368,10 @@ export default async function MinhaContaPage() {
                   >
                     <summary className="cursor-pointer list-none p-4 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
+
                         <div className="min-w-0 flex-1">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
+
                             <span className="text-xs font-bold tracking-wide">
                               #{shortId(order.id)}
                             </span>
@@ -365,7 +394,9 @@ export default async function MinhaContaPage() {
 
                           <p className="truncate text-sm font-semibold">
                             {productName} · {quantity}{' '}
-                            {quantity === 1 ? 'tela' : 'telas'}
+                            {quantity === 1
+                              ? 'tela'
+                              : 'telas'}
                           </p>
 
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -394,6 +425,7 @@ export default async function MinhaContaPage() {
                     {/* CÓDIGOS DO PEDIDO */}
                     <div className="border-t border-border bg-muted/20 p-3 sm:p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
+
                         <div className="flex min-w-0 items-center gap-2">
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <KeyRound className="size-4" />
@@ -437,14 +469,13 @@ export default async function MinhaContaPage() {
                               className="rounded-xl border border-border bg-background p-3"
                             >
                               <div className="flex items-center gap-3">
-                                {/* CÓDIGO */}
+
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate font-mono text-sm font-semibold tracking-wide">
                                     {item.code}
                                   </p>
                                 </div>
 
-                                {/* STATUS + COPIAR */}
                                 <div className="flex shrink-0 items-center gap-4">
                                   <span className="whitespace-nowrap text-[10px] font-semibold text-emerald-600">
                                     Ativo
@@ -452,6 +483,7 @@ export default async function MinhaContaPage() {
 
                                   <CopyButton code={item.code} />
                                 </div>
+
                               </div>
                             </div>
                           ))}
@@ -485,6 +517,7 @@ export default async function MinhaContaPage() {
                   className="rounded-xl border border-border bg-card p-3 shadow-sm"
                 >
                   <div className="flex items-center gap-3">
+
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-mono text-sm font-semibold">
                         {item.code}
@@ -498,6 +531,7 @@ export default async function MinhaContaPage() {
 
                       <CopyButton code={item.code} />
                     </div>
+
                   </div>
                 </div>
               ))}
@@ -511,6 +545,7 @@ export default async function MinhaContaPage() {
             Seus códigos ficam vinculados à sua conta.
           </p>
         </footer>
+
       </div>
     </main>
   )
