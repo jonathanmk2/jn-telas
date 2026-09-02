@@ -101,10 +101,7 @@ export default async function MinhaContaPage() {
     .order('assigned_at', { ascending: false })
 
   if (codesError) {
-    console.error(
-      'Erro ao buscar códigos:',
-      codesError,
-    )
+    console.error('Erro ao buscar códigos:', codesError)
   }
 
   // =====================================================
@@ -129,10 +126,7 @@ export default async function MinhaContaPage() {
       .order('created_at', { ascending: false })
 
   if (ordersError) {
-    console.error(
-      'Erro ao buscar pedidos:',
-      ordersError,
-    )
+    console.error('Erro ao buscar pedidos:', ordersError)
   }
 
   const codeList = (codes ?? []) as CodeItem[]
@@ -159,13 +153,13 @@ export default async function MinhaContaPage() {
         email={profile?.email ?? user.email ?? null}
       />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-5 sm:px-4 sm:py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-6 sm:px-4 sm:py-8">
 
         {/* ================================================= */}
         {/* CABEÇALHO */}
         {/* ================================================= */}
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start justify-between gap-3">
 
           <div className="min-w-0">
 
@@ -181,18 +175,24 @@ export default async function MinhaContaPage() {
 
           </div>
 
-          <div className="flex w-full gap-2 sm:w-auto">
+          {/* BOTÕES DO TOPO */}
+
+          <div className="flex shrink-0 gap-2">
 
             {profile?.is_admin && (
               <Button
                 asChild
                 variant="secondary"
                 size="sm"
-                className="flex-1 sm:flex-none"
               >
                 <Link href="/admin">
                   <Shield className="size-4" />
-                  Admin
+                  <span className="hidden sm:inline">
+                    Painel Admin
+                  </span>
+                  <span className="sm:hidden">
+                    Admin
+                  </span>
                 </Link>
               </Button>
             )}
@@ -200,7 +200,6 @@ export default async function MinhaContaPage() {
             <Button
               asChild
               size="sm"
-              className="flex-1 sm:flex-none"
             >
               <Link href="/#planos">
                 Comprar mais
@@ -215,7 +214,7 @@ export default async function MinhaContaPage() {
         {/* RESUMO */}
         {/* ================================================= */}
 
-        <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-4">
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
 
           <SummaryCard
             icon={Ticket}
@@ -238,26 +237,26 @@ export default async function MinhaContaPage() {
         </div>
 
         {/* ================================================= */}
-        {/* PEDIDOS */}
+        {/* MEUS PEDIDOS */}
         {/* ================================================= */}
 
-        <section className="mt-8 sm:mt-10">
+        <section className="mt-9 sm:mt-10">
 
           <div>
-            <h2 className="text-lg font-semibold sm:text-xl">
+            <h2 className="text-xl font-bold">
               Meus Pedidos
             </h2>
 
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Suas compras e códigos recebidos.
+            <p className="mt-1 text-sm text-muted-foreground">
+              Visualize suas compras e seus códigos.
             </p>
           </div>
 
           {orderList.length === 0 ? (
 
-            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+            <div className="mt-5 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
 
-              <ShoppingBag className="mx-auto size-8 text-muted-foreground" />
+              <ShoppingBag className="mx-auto size-9 text-muted-foreground" />
 
               <p className="mt-3 text-sm text-muted-foreground">
                 Nenhum pedido registrado ainda.
@@ -265,8 +264,7 @@ export default async function MinhaContaPage() {
 
               <Button
                 asChild
-                className="mt-4"
-                size="sm"
+                className="mt-5"
               >
                 <Link href="/#planos">
                   Ver planos
@@ -277,7 +275,7 @@ export default async function MinhaContaPage() {
 
           ) : (
 
-            <div className="mt-4 space-y-2.5 sm:space-y-3">
+            <div className="mt-5 space-y-3">
 
               {orderList.map((order) => {
 
@@ -303,20 +301,6 @@ export default async function MinhaContaPage() {
                   orderCodes.length ||
                   1
 
-                const codesForCopy =
-                  orderCodes.map(
-                    (code) => code.code,
-                  )
-
-                /*
-                 * O nome do produto original pode ser
-                 * "1 Tela JN TELAS", "5 Telas JN TELAS",
-                 * etc.
-                 *
-                 * Como agora a quantidade é independente,
-                 * mostramos a quantidade REAL comprada.
-                 */
-
                 const productName =
                   product?.name
                     ?.replace(
@@ -333,23 +317,23 @@ export default async function MinhaContaPage() {
                 return (
                   <details
                     key={order.id}
-                    className="group overflow-hidden rounded-xl border border-border/60 bg-card"
+                    className="group overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm"
                   >
 
-                    {/* ===================================== */}
-                    {/* PEDIDO FECHADO */}
-                    {/* ===================================== */}
+                    {/* ================================================= */}
+                    {/* CABEÇALHO DO PEDIDO */}
+                    {/* ================================================= */}
 
-                    <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 transition-colors hover:bg-secondary/20 sm:gap-4 sm:p-5">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 p-4 sm:p-5">
 
                       <div className="min-w-0 flex-1">
 
-                        {/* PRIMEIRA LINHA */}
+                        {/* PEDIDO + STATUS */}
 
                         <div className="flex flex-wrap items-center gap-2">
 
                           <span className="text-sm font-bold sm:text-base">
-                            #{shortOrderId}
+                            Pedido #{shortOrderId}
                           </span>
 
                           <StatusBadge
@@ -359,9 +343,9 @@ export default async function MinhaContaPage() {
 
                         </div>
 
-                        {/* SEGUNDA LINHA */}
+                        {/* QUANTIDADE + DATA */}
 
-                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
 
                           <span className="font-medium text-foreground">
                             {quantity}{' '}
@@ -370,9 +354,7 @@ export default async function MinhaContaPage() {
                               : 'códigos'}
                           </span>
 
-                          <span className="text-border">
-                            •
-                          </span>
+                          <span>•</span>
 
                           <span>
                             {formatDate(
@@ -382,9 +364,9 @@ export default async function MinhaContaPage() {
 
                         </div>
 
-                        {/* TERCEIRA LINHA */}
+                        {/* PRODUTO + VALOR */}
 
-                        <div className="mt-1 flex min-w-0 items-center gap-2">
+                        <div className="mt-1.5 flex min-w-0 items-center gap-2">
 
                           <span className="min-w-0 truncate text-xs text-muted-foreground sm:text-sm">
                             {productName} · {quantity}{' '}
@@ -403,31 +385,33 @@ export default async function MinhaContaPage() {
 
                       </div>
 
+                      {/* ================================================= */}
                       {/* ABRIR */}
+                      {/* ================================================= */}
 
                       <div className="flex shrink-0 items-center gap-1">
 
-                        <span className="hidden text-xs font-medium text-primary sm:inline">
+                        <span className="hidden text-sm font-medium text-primary sm:inline">
                           Ver códigos
                         </span>
 
-                        <ChevronDown className="size-5 text-muted-foreground transition-transform group-open:rotate-180" />
+                        <ChevronDown className="size-5 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
 
                       </div>
 
                     </summary>
 
-                    {/* ===================================== */}
-                    {/* CONTEÚDO */}
-                    {/* ===================================== */}
+                    {/* ================================================= */}
+                    {/* CÓDIGOS */}
+                    {/* ================================================= */}
 
                     <div className="border-t border-border/60 bg-background/20 p-3 sm:p-4">
 
                       {orderCodes.length === 0 ? (
 
-                        <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                        <div className="rounded-xl border border-dashed border-border p-6 text-center">
 
-                          <p className="text-xs text-muted-foreground sm:text-sm">
+                          <p className="text-sm text-muted-foreground">
                             {order.status === 'delivered'
                               ? 'Os códigos deste pedido ainda estão sendo organizados.'
                               : 'Os códigos aparecerão aqui após a confirmação e entrega do pedido.'}
@@ -439,13 +423,15 @@ export default async function MinhaContaPage() {
 
                         <div>
 
-                          {/* CABEÇALHO */}
+                          {/* ================================================= */}
+                          {/* TÍTULO + COPIAR TODOS */}
+                          {/* ================================================= */}
 
                           <div className="mb-3 flex items-center justify-between gap-3">
 
                             <div className="flex min-w-0 items-center gap-2">
 
-                              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                                 <PackageCheck className="size-4 text-primary" />
                               </div>
 
@@ -455,7 +441,7 @@ export default async function MinhaContaPage() {
                                   Códigos deste pedido
                                 </p>
 
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                   {orderCodes.length}{' '}
                                   {orderCodes.length === 1
                                     ? 'código'
@@ -467,12 +453,17 @@ export default async function MinhaContaPage() {
                             </div>
 
                             <CopyAllButton
-                              codes={codesForCopy}
+                              codes={orderCodes.map(
+                                (code) =>
+                                  code.code,
+                              )}
                             />
 
                           </div>
 
-                          {/* CÓDIGOS */}
+                          {/* ================================================= */}
+                          {/* LISTA DE CÓDIGOS */}
+                          {/* ================================================= */}
 
                           <div className="space-y-2">
 
@@ -480,10 +471,10 @@ export default async function MinhaContaPage() {
                               (code) => (
                                 <div
                                   key={code.id}
-                                  className="flex items-center gap-2 rounded-lg border border-border/60 bg-card p-2.5 sm:p-3"
+                                  className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-2.5 sm:p-3"
                                 >
 
-                                  <code className="min-w-0 flex-1 truncate rounded-md bg-secondary px-2 py-1.5 font-mono text-xs font-medium sm:text-sm">
+                                  <code className="min-w-0 flex-1 truncate rounded-lg bg-secondary px-2.5 py-2 font-mono text-xs font-medium sm:text-sm">
                                     {code.code}
                                   </code>
 
@@ -498,7 +489,7 @@ export default async function MinhaContaPage() {
                                     value={
                                       code.code
                                     }
-                                    className="size-8 shrink-0 px-1.5 sm:size-9"
+                                    className="size-9 shrink-0 px-2"
                                   />
 
                                 </div>
@@ -529,13 +520,13 @@ export default async function MinhaContaPage() {
 
         {oldCodes.length > 0 && (
 
-          <section className="mt-8 sm:mt-10">
+          <section className="mt-9">
 
-            <h2 className="text-lg font-semibold sm:text-xl">
+            <h2 className="text-xl font-bold">
               Outros Códigos
             </h2>
 
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            <p className="mt-1 text-sm text-muted-foreground">
               Códigos adquiridos antes da organização por pedidos.
             </p>
 
@@ -558,7 +549,7 @@ export default async function MinhaContaPage() {
 
                       <div className="flex min-w-0 items-center gap-2">
 
-                        <code className="min-w-0 flex-1 truncate rounded-md bg-secondary px-2 py-1.5 font-mono text-xs sm:text-sm">
+                        <code className="min-w-0 flex-1 truncate rounded-lg bg-secondary px-2.5 py-2 font-mono text-xs sm:text-sm">
                           {code.code}
                         </code>
 
@@ -581,7 +572,7 @@ export default async function MinhaContaPage() {
 
                     <CopyButton
                       value={code.code}
-                      className="size-8 shrink-0 px-1.5 sm:size-9"
+                      className="size-9 shrink-0 px-2"
                     />
 
                   </div>
@@ -600,7 +591,7 @@ export default async function MinhaContaPage() {
 }
 
 // =====================================================
-// CARDS DE RESUMO
+// CARD DE RESUMO
 // =====================================================
 
 function SummaryCard({
