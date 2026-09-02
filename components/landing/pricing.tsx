@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
 import { createOrder } from '@/app/actions/orders'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 
 export type Product = {
   id: string
@@ -38,27 +37,6 @@ type OrderStatus =
   | 'delivered'
   | 'cancelled'
   | 'unknown'
-
-const featuresByScreens: Record<number, string[]> = {
-  1: [
-    '1 tela simultânea',
-    'Acesso por 30 dias',
-    'Suporte via WhatsApp',
-  ],
-
-  5: [
-    '5 telas simultâneas',
-    'Acesso por 30 dias',
-    'Suporte prioritário',
-  ],
-
-  10: [
-    '10 telas simultâneas',
-    'Acesso por 30 dias',
-    'Suporte prioritário',
-    'Melhor custo por tela',
-  ],
-}
 
 /*
  * REGRA DE PREÇO
@@ -91,6 +69,18 @@ function getPriceLabel(quantity: number): string {
   return 'R$ 35,00 por tela'
 }
 
+function getNextPriceMessage(quantity: number): string | null {
+  if (quantity < 5) {
+    return `A partir de 5 telas: R$ 34,00 por tela`
+  }
+
+  if (quantity < 10) {
+    return `A partir de 10 telas: R$ 33,00 por tela`
+  }
+
+  return 'Melhor preço disponível'
+}
+
 export function Pricing({
   products,
   isLoggedIn,
@@ -102,9 +92,6 @@ export function Pricing({
 
   const [pending, startTransition] = useTransition()
 
-  const [activeId, setActiveId] =
-    useState<string | null>(null)
-
   const [payment, setPayment] =
     useState<PaymentData | null>(null)
 
@@ -115,68 +102,58 @@ export function Pricing({
     useState(false)
 
   /*
-   * Quantidade selecionada para cada produto.
+   * Usa o produto de 1 tela como produto base.
    *
-   * Cada plano começa com a quantidade mínima dele:
-   *
-   * Plano 1  -> 1
-   * Plano 5  -> 5
-   * Plano 10 -> 10
+   * A quantidade real da compra vem do seletor abaixo.
    */
-  const [quantities, setQuantities] =
-    useState<Record<string, number>>(() => {
-      const initial: Record<string, number> = {}
+  const product =
+    products.find((item) => item.screens === 1) ??
+    products[0] ??
+    null
 
-      for (const product of products) {
-        initial[product.id] =
-          product.screens
-      }
+  /*
+   * Quantidade começa SEMPRE em 1.
+   */
+  const [quantity, setQuantity] =
+    useState(1)
 
-      return initial
-    })
-
-  function getQuantity(product: Product): number {
-    return quantities[product.id] ??
-      product.screens
-  }
-
-  function changeQuantity(
-    product: Product,
-    value: number,
-  ) {
-    const quantity = Math.max(
+  function changeQuantity(value: number) {
+    const newQuantity = Math.max(
       1,
       Math.min(500, Math.floor(value)),
     )
 
-    setQuantities((current) => ({
-      ...current,
-      [product.id]: quantity,
-    }))
+    setQuantity(newQuantity)
   }
 
-  function getTotalCents(
-    quantity: number,
-  ): number {
-    return (
-      quantity *
-      getUnitPriceCents(quantity)
-    )
-  }
+  const unitPriceCents =
+    getUnitPriceCents(quantity)
 
-  function handleBuy(product: Product) {
+  const totalCents =
+    quantity * unitPriceCents
+
+  const priceLabel =
+    getPriceLabel(quantity)
+
+  const nextPriceMessage =
+    getNextPriceMessage(quantity)
+
+  function handleBuy() {
+    if (!product) {
+      toast.error(
+        'Produto não encontrado.',
+      )
+
+      return
+    }
+
     if (!isLoggedIn) {
       router.push(
         '/auth/sign-up?next=/minha-conta',
       )
+
       return
     }
-
-    const quantity =
-      getQuantity(product)
-
-    const totalCents =
-      getTotalCents(quantity)
 
     console.log(
       'Iniciando compra:',
@@ -187,20 +164,8 @@ export function Pricing({
       },
     )
 
-    setActiveId(product.id)
-
     startTransition(async () => {
       try {
-        /*
-         * ATENÇÃO:
-         *
-         * O createOrder ainda precisa ser
-         * atualizado no servidor para receber
-         * a quantidade.
-         *
-         * Por enquanto enviamos produto + quantidade
-         * através da nova assinatura.
-         */
         const res = await createOrder(
           product.id,
           quantity,
@@ -245,8 +210,6 @@ export function Pricing({
         toast.error(
           'Ocorreu um erro inesperado ao gerar o pagamento.',
         )
-      } finally {
-        setActiveId(null)
       }
     })
   }
@@ -376,8 +339,6 @@ export function Pricing({
     orderStatus,
   ])
 
-  const highlighted = 5
-
   const qrImage =
     payment?.qrCodeBase64
       ? payment.qrCodeBase64.startsWith(
@@ -397,273 +358,305 @@ export function Pricing({
         id="planos"
         className="scroll-mt-20 bg-secondary/30 py-20"
       >
-        <div className="mx-auto max-w-6xl px-4">
+        <div className="mx-auto max-w-3xl px-4">
+
+          {/* CABEÇALHO */}
 
           <div className="mx-auto max-w-2xl text-center">
 
             <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-              Planos e preços
+              LD CLOUD VIP
             </h2>
 
             <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
-              Escolha a quantidade de telas ideal para você.
+              Escolha quantas telas você precisa e pague tudo em um único PIX.
             </p>
 
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {/* CARD ÚNICO */}
 
-            {products.map((product) => {
+          {product && (
+            <div className="relative mx-auto mt-12 max-w-xl rounded-2xl border border-primary bg-card p-6 shadow-lg shadow-primary/10 sm:p-8">
 
-              const isHighlight =
-                product.screens === highlighted
+              {/* BADGE */}
 
-              const features =
-                featuresByScreens[
-                  product.screens
-                ] ?? []
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
+                30 dias de acesso
+              </div>
 
-              const quantity =
-                getQuantity(product)
+              {/* PRODUTO */}
 
-              const unitPriceCents =
-                getUnitPriceCents(
-                  quantity,
-                )
+              <div className="text-center">
 
-              const totalCents =
-                getTotalCents(
-                  quantity,
-                )
+                <h3 className="text-2xl font-bold">
+                  LD CLOUD VIP
+                </h3>
 
-              const loading =
-                pending &&
-                activeId === product.id
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Acesso VIP por 30 dias
+                </p>
 
-              return (
-                <div
-                  key={product.id}
-                  className={cn(
-                    'relative flex flex-col rounded-2xl border bg-card p-6',
-                    isHighlight
-                      ? 'border-primary shadow-lg shadow-primary/10'
-                      : 'border-border/60',
-                  )}
-                >
+              </div>
 
-                  {isHighlight && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                      Mais popular
-                    </span>
-                  )}
+              {/* PREÇO */}
 
-                  <h3 className="text-lg font-semibold">
-                    {product.name}
-                  </h3>
+              <div className="mt-8 text-center">
 
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {product.description ??
-                      `Acesso para ${product.screens} tela(s)`}
-                  </p>
+                <div className="flex items-end justify-center gap-2">
 
-                  {/* PREÇO */}
+                  <span className="text-5xl font-bold tracking-tight">
+                    {formatBRL(unitPriceCents)}
+                  </span>
 
-                  <div className="mt-5">
+                  <span className="mb-2 text-sm text-muted-foreground">
+                    / tela
+                  </span>
 
-                    <div className="flex items-end gap-1">
+                </div>
 
-                      <span className="text-4xl font-bold tracking-tight">
-                        {formatBRL(
-                          unitPriceCents,
-                        )}
-                      </span>
+                <p className="mt-2 text-sm font-medium text-primary">
+                  {priceLabel}
+                </p>
 
-                      <span className="mb-1 text-sm text-muted-foreground">
-                        /tela
-                      </span>
+              </div>
 
-                    </div>
+              {/* QUANTIDADE */}
 
-                    <p className="mt-1 text-sm text-primary">
-                      {getPriceLabel(
-                        quantity,
-                      )}
-                    </p>
+              <div className="mt-8">
 
-                  </div>
+                <p className="mb-3 text-center text-sm font-semibold">
+                  Quantidade de telas
+                </p>
 
-                  {/* QUANTIDADE */}
-
-                  <div className="mt-6">
-
-                    <p className="mb-2 text-sm font-medium">
-                      Quantidade de telas
-                    </p>
-
-                    <div className="flex items-center gap-2">
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-10 shrink-0"
-                        onClick={() =>
-                          changeQuantity(
-                            product,
-                            quantity - 1,
-                          )
-                        }
-                        disabled={
-                          loading ||
-                          quantity <= 1
-                        }
-                        aria-label="Diminuir quantidade"
-                      >
-                        <Minus className="size-4" />
-                      </Button>
-
-                      <input
-                        type="number"
-                        min={1}
-                        max={500}
-                        value={quantity}
-                        disabled={loading}
-                        onChange={(event) => {
-                          const value =
-                            Number(
-                              event.target.value,
-                            )
-
-                          if (
-                            Number.isFinite(
-                              value,
-                            )
-                          ) {
-                            changeQuantity(
-                              product,
-                              value,
-                            )
-                          }
-                        }}
-                        className="h-10 w-full rounded-md border bg-background px-3 text-center text-base font-semibold"
-                        aria-label="Quantidade de telas"
-                      />
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-10 shrink-0"
-                        onClick={() =>
-                          changeQuantity(
-                            product,
-                            quantity + 1,
-                          )
-                        }
-                        disabled={
-                          loading ||
-                          quantity >= 500
-                        }
-                        aria-label="Aumentar quantidade"
-                      >
-                        <Plus className="size-4" />
-                      </Button>
-
-                    </div>
-
-                  </div>
-
-                  {/* TOTAL */}
-
-                  <div className="mt-5 rounded-xl border bg-secondary/40 p-4">
-
-                    <div className="flex items-center justify-between text-sm">
-
-                      <span className="text-muted-foreground">
-                        {quantity} ×{' '}
-                        {formatBRL(
-                          unitPriceCents,
-                        )}
-                      </span>
-
-                      <span className="font-semibold">
-                        {formatBRL(
-                          totalCents,
-                        )}
-                      </span>
-
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between">
-
-                      <span className="text-sm font-medium">
-                        Total a pagar
-                      </span>
-
-                      <span className="text-xl font-bold">
-                        {formatBRL(
-                          totalCents,
-                        )}
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                  <ul className="mt-6 flex flex-1 flex-col gap-3">
-
-                    {features.map(
-                      (feature) => (
-                        <li
-                          key={feature}
-                          className="flex items-start gap-2 text-sm"
-                        >
-
-                          <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-
-                          <span className="text-muted-foreground">
-                            {feature}
-                          </span>
-
-                        </li>
-                      ),
-                    )}
-
-                  </ul>
+                <div className="mx-auto flex max-w-sm items-center gap-3">
 
                   <Button
-                    className="mt-8"
-                    variant={
-                      isHighlight
-                        ? 'default'
-                        : 'secondary'
-                    }
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-12 shrink-0"
                     onClick={() =>
-                      handleBuy(product)
+                      changeQuantity(
+                        quantity - 1,
+                      )
                     }
-                    disabled={loading}
+                    disabled={
+                      pending ||
+                      quantity <= 1
+                    }
+                    aria-label="Diminuir quantidade"
                   >
-                    {loading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        Comprar{' '}
-                        {quantity}{' '}
-                        {quantity === 1
-                          ? 'tela'
-                          : 'telas'}
-                      </>
-                    )}
+                    <Minus className="size-5" />
+                  </Button>
+
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={quantity}
+                    disabled={pending}
+                    onChange={(event) => {
+                      const value =
+                        Number(
+                          event.target.value,
+                        )
+
+                      if (
+                        Number.isFinite(
+                          value,
+                        )
+                      ) {
+                        changeQuantity(
+                          value,
+                        )
+                      }
+                    }}
+                    className="h-12 w-full rounded-lg border bg-background px-3 text-center text-xl font-bold"
+                    aria-label="Quantidade de telas"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-12 shrink-0"
+                    onClick={() =>
+                      changeQuantity(
+                        quantity + 1,
+                      )
+                    }
+                    disabled={
+                      pending ||
+                      quantity >= 500
+                    }
+                    aria-label="Aumentar quantidade"
+                  >
+                    <Plus className="size-5" />
                   </Button>
 
                 </div>
-              )
-            })}
 
-          </div>
+              </div>
+
+              {/* DESCONTO POR QUANTIDADE */}
+
+              <div className="mt-6 rounded-xl border bg-secondary/40 p-4">
+
+                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+
+                  <div
+                    className={
+                      quantity < 5
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    1–4 telas
+                    <br />
+                    <span className="text-xs">
+                      R$ 35,00 / tela
+                    </span>
+                  </div>
+
+                  <div
+                    className={
+                      quantity >= 5 &&
+                      quantity < 10
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    5–9 telas
+                    <br />
+                    <span className="text-xs">
+                      R$ 34,00 / tela
+                    </span>
+                  </div>
+
+                  <div
+                    className={
+                      quantity >= 10
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    10+ telas
+                    <br />
+                    <span className="text-xs">
+                      R$ 33,00 / tela
+                    </span>
+                  </div>
+
+                </div>
+
+                {nextPriceMessage && (
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    {nextPriceMessage}
+                  </p>
+                )}
+
+              </div>
+
+              {/* TOTAL */}
+
+              <div className="mt-6 rounded-xl border bg-background p-5">
+
+                <div className="flex items-center justify-between text-sm">
+
+                  <span className="text-muted-foreground">
+                    {quantity} ×{' '}
+                    {formatBRL(
+                      unitPriceCents,
+                    )}
+                  </span>
+
+                  <span className="font-semibold">
+                    {formatBRL(
+                      totalCents,
+                    )}
+                  </span>
+
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+
+                  <span className="text-base font-semibold">
+                    Total a pagar
+                  </span>
+
+                  <span className="text-2xl font-bold">
+                    {formatBRL(
+                      totalCents,
+                    )}
+                  </span>
+
+                </div>
+
+              </div>
+
+              {/* BENEFÍCIOS */}
+
+              <ul className="mt-7 space-y-3">
+
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">
+                    Telas simultâneas conforme quantidade comprada
+                  </span>
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">
+                    Acesso VIP por 30 dias
+                  </span>
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">
+                    Suporte via WhatsApp
+                  </span>
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">
+                    Um único pagamento PIX
+                  </span>
+                </li>
+
+              </ul>
+
+              {/* BOTÃO */}
+
+              <Button
+                className="mt-8 h-12 w-full text-base"
+                onClick={handleBuy}
+                disabled={
+                  pending ||
+                  !product
+                }
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="size-5 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    Comprar{' '}
+                    {quantity}{' '}
+                    {quantity === 1
+                      ? 'tela'
+                      : 'telas'}
+                  </>
+                )}
+              </Button>
+
+            </div>
+          )}
 
         </div>
       </section>
