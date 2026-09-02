@@ -29,11 +29,16 @@ async function requireAdmin(): Promise<string | null> {
     return null
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (error) {
+    console.error('Erro ao verificar administrador:', error)
+    return null
+  }
 
   if (!profile?.is_admin) {
     return null
@@ -93,6 +98,7 @@ export async function createCodes(
 
   let rows: {
     code: string
+    product_id: string | null
     status: string
   }[] = []
 
@@ -124,6 +130,7 @@ export async function createCodes(
 
     rows = codes.map((code) => ({
       code,
+      product_id: null,
       status: 'active',
     }))
   } else {
@@ -148,6 +155,7 @@ export async function createCodes(
       { length: quantity },
       () => ({
         code: randomCode(),
+        product_id: null,
         status: 'active',
       }),
     )
@@ -171,14 +179,14 @@ export async function createCodes(
       return {
         ok: false,
         error:
-          'Um ou mais códigos já existem.',
+          'Um ou mais códigos já existem. Tente novamente.',
       }
     }
 
     return {
       ok: false,
       error:
-        'Não foi possível criar os códigos.',
+        `Erro Supabase: ${error.message}`,
     }
   }
 
@@ -186,7 +194,8 @@ export async function createCodes(
 
   return {
     ok: true,
-    message: `${rows.length} código(s) adicionado(s) ao estoque.`,
+    message:
+      `${rows.length} código(s) adicionado(s) ao estoque.`,
   }
 }
 
@@ -235,7 +244,7 @@ export async function assignCode(
     return {
       ok: false,
       error:
-        'Não foi possível atribuir o código.',
+        `Erro Supabase: ${error.message}`,
     }
   }
 
@@ -303,7 +312,7 @@ export async function setCodeStatus(
     return {
       ok: false,
       error:
-        'Não foi possível atualizar o código.',
+        `Erro Supabase: ${error.message}`,
     }
   }
 
@@ -355,7 +364,7 @@ export async function deleteCode(
     return {
       ok: false,
       error:
-        'Não foi possível excluir o código.',
+        `Erro Supabase: ${error.message}`,
     }
   }
 
@@ -424,7 +433,7 @@ export async function setOrderStatus(
     return {
       ok: false,
       error:
-        'Não foi possível atualizar o pedido.',
+        `Erro Supabase: ${error.message}`,
     }
   }
 
