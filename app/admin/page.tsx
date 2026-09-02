@@ -1,223 +1,146 @@
-import { redirect } from 'next/navigation'
+import { SiteNavbar } from '@/components/site-navbar'
+import { Hero } from '@/components/landing/hero'
+import { Benefits } from '@/components/landing/benefits'
+import { Pricing, type Product } from '@/components/landing/pricing'
+import { Faq } from '@/components/landing/faq'
+import { Support } from '@/components/landing/support'
+import { Footer } from '@/components/landing/footer'
+import { WhatsAppButton } from '@/components/whatsapp-button'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { DashboardNavbar } from '@/components/dashboard/dashboard-navbar'
-import { AdminDashboard } from '@/components/admin/admin-dashboard'
 
-export type AdminCustomer = {
-  id: string
-  email: string | null
-  full_name: string | null
-  created_at: string
-  codeCount: number
-  orderCount: number
-}
+export const dynamic = 'force-dynamic'
 
-export type AdminCode = {
-  id: string
-  code: string
-  status: string
-  created_at: string
-  assigned_at: string | null
-  user_id: string | null
-  userEmail: string | null
-  productName: string | null
-  productId: string | null
-}
+export default async function HomePage() {
+  const hasSupabase = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ),
+  )
 
-export type AdminOrder = {
-  id: string
-  status: string
-  total_cents: number
-  created_at: string
-  userEmail: string | null
-  productName: string | null
-}
+  let user: {
+    email?: string | null
+  } | null = null
 
-export type AdminProductOption = {
-  id: string
-  name: string
-}
+  let products: Product[] = [
+    {
+      id: 'plano-1-tela',
+      name: '1 Tela LD CLOUD VIP',
+      screens: 1,
+      price_cents: 3500,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+    {
+      id: 'plano-5-telas',
+      name: '5 Telas LD CLOUD VIP',
+      screens: 5,
+      price_cents: 17000,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+    {
+      id: 'plano-10-telas',
+      name: '10 Telas LD CLOUD VIP',
+      screens: 10,
+      price_cents: 33000,
+      description: 'Versão VIP • Acesso por 30 dias',
+    },
+  ]
 
-export default async function AdminPage() {
-  const supabase = await createClient()
+  let isAdmin = false
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  if (hasSupabase) {
+    try {
+      const supabase = await createClient()
 
-  if (!user) {
-    redirect('/auth/login?next=/admin')
-  }
+      const {
+        data: { user: sessionUser },
+      } = await supabase.auth.getUser()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_admin, email')
-    .eq('id', user.id)
-    .single()
+      user = sessionUser
 
-  if (!profile?.is_admin) {
-    redirect('/minha-conta')
-  }
+      /*
+       * Carrega os produtos ativos.
+       */
+      const { data: productData } = await supabase
+        .from('products')
+        .select(
+          'id, name, screens, price_cents, description',
+        )
+        .eq('active', true)
+        .order('screens', { ascending: true })
 
-  const admin = createAdminClient()
+      if (productData && productData.length > 0) {
+        products = productData as Product[]
+      }
 
-  const profilesResult = await admin
-    .from('profiles')
-    .select('id, email, full_name, created_at')
-    .order('created_at', { ascending: false })
+      /*
+       * Verifica se o usuário logado é administrador.
+       *
+       * IMPORTANTE:
+       * O valor vem diretamente do perfil do usuário.
+       * Somente is_admin = true libera o botão Admin.
+       */
+      if (sessionUser) {
+        const { data: profile, error: profileError } =
+          await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', sessionUser.id)
+            .maybeSingle()
 
-  const codesResult = await admin
-    .from('activation_codes')
-    .select(
-      'id, code, status, created_at, assigned_at, user_id, products(id, name)',
-    )
-    .order('created_at', { ascending: false })
+        if (profileError) {
+          console.error(
+            'Erro ao verificar administrador:',
+            profileError,
+          )
 
-  const ordersResult = await admin
-    .from('orders')
-    .select(
-      'id, status, total_cents, created_at, user_id, products(name)',
-    )
-    .order('created_at', { ascending: false })
+          isAdmin = false
+        } else {
+          isAdmin = profile?.is_admin === true
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Supabase indisponível:',
+        error,
+      )
 
-  const productsResult = await admin
-    .from('products')
-    .select('id, name')
-    .order('screens', { ascending: true })
-
-  const profileList = profilesResult.data ?? []
-  const codeList = codesResult.data ?? []
-  const orderList = ordersResult.data ?? []
-  const productList = productsResult.data ?? []
-
-  /*
-   * Mapa dos clientes.
-   *
-   * O user_id dos códigos/pedidos aponta para profiles.id.
-   * Assim conseguimos mostrar o e-mail do cliente sem
-   * depender de relacionamento automático do Supabase.
-   */
-  const emailById = new Map<string, string | null>()
-
-  const nameById = new Map<string, string | null>()
-
-  for (const profile of profileList) {
-    emailById.set(profile.id, profile.email ?? null)
-    nameById.set(profile.id, profile.full_name ?? null)
-  }
-
-  const customers: AdminCustomer[] = profileList.map((profile) => ({
-    id: profile.id,
-    email: profile.email,
-    full_name: profile.full_name,
-    created_at: profile.created_at,
-
-    codeCount: codeList.filter(
-      (code) => code.user_id === profile.id,
-    ).length,
-
-    orderCount: orderList.filter(
-      (order) => order.user_id === profile.id,
-    ).length,
-  }))
-
-  const adminCodes: AdminCode[] = codeList.map((code) => {
-    const product = Array.isArray(code.products)
-      ? code.products[0]
-      : code.products
-
-    const userEmail = code.user_id
-      ? emailById.get(code.user_id) ?? null
-      : null
-
-    return {
-      id: code.id,
-      code: code.code,
-      status: code.status,
-      created_at: code.created_at,
-      assigned_at: code.assigned_at,
-      user_id: code.user_id,
-
-      userEmail,
-
-      productName: product?.name ?? null,
-
-      productId: product?.id ?? null,
+      isAdmin = false
     }
-  })
-
-  const adminOrders: AdminOrder[] = orderList.map((order) => {
-    const product = Array.isArray(order.products)
-      ? order.products[0]
-      : order.products
-
-    const userEmail = order.user_id
-      ? emailById.get(order.user_id) ?? null
-      : null
-
-    return {
-      id: order.id,
-      status: order.status,
-      total_cents: order.total_cents,
-      created_at: order.created_at,
-
-      userEmail,
-
-      productName: product?.name ?? null,
-    }
-  })
-
-  const productOptions: AdminProductOption[] =
-    productList.map((product) => ({
-      id: product.id,
-      name: product.name,
-    }))
-
-  const customerOptions = customers.map((customer) => ({
-    id: customer.id,
-
-    label:
-      customer.email ??
-      customer.full_name ??
-      customer.id,
-  }))
+  }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-
-      <DashboardNavbar
-        email={
-          profile.email ??
-          user.email ??
-          null
+    <div className="flex min-h-dvh flex-col">
+      <SiteNavbar
+        user={
+          user
+            ? {
+                email: user.email ?? null,
+                isAdmin,
+              }
+            : null
         }
       />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="flex-1">
+        <Hero />
 
-        <div className="mb-6">
-
-          <h1 className="text-2xl font-bold tracking-tight">
-            Painel Administrativo
-          </h1>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie clientes, códigos de ativação e pedidos.
-          </p>
-
-        </div>
-
-        <AdminDashboard
-          customers={customers}
-          codes={adminCodes}
-          orders={adminOrders}
-          productOptions={productOptions}
-          customerOptions={customerOptions}
+        {/* CARD DE VENDA — MANTIDO */}
+        <Pricing
+          products={products}
+          isLoggedIn={!!user}
         />
 
+        {/* DEMAIS INFORMAÇÕES */}
+        <Benefits />
+        <Faq />
+        <Support />
       </main>
 
+      <Footer />
+
+      <WhatsAppButton />
     </div>
   )
 }
