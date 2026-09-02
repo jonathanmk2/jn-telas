@@ -3,14 +3,13 @@ import { redirect } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
-  Copy,
   KeyRound,
   PackageCheck,
   ShieldCheck,
   ShoppingBag,
 } from 'lucide-react'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { CopyButton } from '@/components/copy-button'
 import { CopyAllButton } from '@/components/copy-all-button'
 
@@ -88,32 +87,31 @@ function getStatusClasses(status: string) {
   switch (status) {
     case 'delivered':
     case 'paid':
-      return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+      return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
 
     case 'pending':
-      return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+      return 'border-amber-500/20 bg-amber-500/10 text-amber-600'
 
     case 'cancelled':
     case 'canceled':
-      return 'bg-red-500/10 text-red-600 border-red-500/20'
+      return 'border-red-500/20 bg-red-500/10 text-red-600'
 
     default:
-      return 'bg-muted text-muted-foreground border-border'
+      return 'border-border bg-muted text-muted-foreground'
   }
 }
 
 function normalizeProductName(name: string | null | undefined) {
-  const normalized =
-    name
-      ?.replace(/^\d+\s*Telas?\s*/i, '')
-      ?.replace(/^JN TELAS\s*[-·]?\s*/i, '')
-      ?.trim()
+  const normalized = name
+    ?.replace(/^\d+\s*Telas?\s*/i, '')
+    ?.replace(/^JN TELAS\s*[-·]?\s*/i, '')
+    ?.trim()
 
   return normalized || 'LD CLOUD VIP'
 }
 
 export default async function MinhaContaPage() {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createClient()
 
   const {
     data: { user },
@@ -175,10 +173,6 @@ export default async function MinhaContaPage() {
 
   const codes = (activationCodes ?? []) as unknown as ActivationCode[]
   const userOrders = (orders ?? []) as unknown as Order[]
-
-  const deliveredCodes = codes.filter(
-    (code) => code.order_id !== null,
-  )
 
   const oldCodes = codes.filter(
     (code) => code.order_id === null,
@@ -287,6 +281,7 @@ export default async function MinhaContaPage() {
                 <p className="text-sm font-semibold">
                   Comprar mais telas
                 </p>
+
                 <p className="text-xs text-primary-foreground/75">
                   Adicione novos códigos à sua conta
                 </p>
