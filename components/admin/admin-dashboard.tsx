@@ -40,13 +40,26 @@ type Code = {
   orderId: string | null
 }
 
+type OrderCode = {
+  id: string
+  code: string
+  status: string
+  created_at: string
+  assigned_at: string | null
+}
+
 type Order = {
   id: string
   status: string
   total_cents: number
+  quantity: number
   created_at: string
+  userId: string | null
   userEmail: string | null
+  userName: string | null
   productName: string | null
+  productId: string | null
+  codes: OrderCode[]
 }
 
 type ProductOption = {
@@ -111,6 +124,22 @@ export function AdminDashboard({
     useState<Extract<SyncResult, { ok: true }> | null>(
       null,
     )
+
+  /*
+   * =========================================================
+   * PEDIDOS EXPANDIDOS
+   * =========================================================
+   */
+
+  const [expandedOrders, setExpandedOrders] =
+    useState<Record<string, boolean>>({})
+
+  function toggleOrder(orderId: string) {
+    setExpandedOrders((current) => ({
+      ...current,
+      [orderId]: !current[orderId],
+    }))
+  }
 
   /*
    * =========================================================
@@ -299,11 +328,6 @@ export function AdminDashboard({
   /*
    * =========================================================
    * CÓDIGOS FILTRADOS
-   *
-   * Busca por:
-   * - código
-   * - cliente/e-mail
-   * - pedido
    * =========================================================
    */
 
@@ -313,10 +337,6 @@ export function AdminDashboard({
       .toLowerCase()
 
     return codes.filter((code) => {
-      /*
-       * FILTRO POR STATUS
-       */
-
       if (codeFilter === 'available') {
         if (
           code.status !== 'active' ||
@@ -338,17 +358,9 @@ export function AdminDashboard({
         }
       }
 
-      /*
-       * SEM BUSCA
-       */
-
       if (!search) {
         return true
       }
-
-      /*
-       * CAMPOS PESQUISÁVEIS
-       */
 
       const searchableText = [
         code.code,
@@ -396,7 +408,7 @@ export function AdminDashboard({
 
   /*
    * =========================================================
-   * STATUS VISUAL
+   * STATUS VISUAL DOS CÓDIGOS
    * =========================================================
    */
 
@@ -433,6 +445,33 @@ export function AdminDashboard({
 
       default:
         return 'border-border bg-muted text-muted-foreground'
+    }
+  }
+
+  /*
+   * =========================================================
+   * STATUS DOS PEDIDOS
+   * =========================================================
+   */
+
+  function getOrderStatusLabel(
+    status: string,
+  ) {
+    switch (status) {
+      case 'pending':
+        return 'PENDENTE'
+
+      case 'paid':
+        return 'PAGO'
+
+      case 'delivered':
+        return 'ENTREGUE'
+
+      case 'cancelled':
+        return 'CANCELADO'
+
+      default:
+        return status.toUpperCase()
     }
   }
 
@@ -1494,9 +1533,21 @@ G0V7S4N0M5M6C0R5`}
 
       <section>
 
-        <h2 className="text-lg font-semibold">
-          Pedidos ({orders.length})
-        </h2>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
+          <div>
+
+            <h2 className="text-lg font-semibold">
+              Pedidos ({orders.length})
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Clique em um pedido para visualizar todos os detalhes e códigos entregues.
+            </p>
+
+          </div>
+
+        </div>
 
         <div className="mt-3 overflow-x-auto rounded-xl border border-border/60">
 
@@ -1526,106 +1577,376 @@ G0V7S4N0M5M6C0R5`}
                   Status
                 </th>
 
+                <th className="px-4 py-3">
+                  Detalhes
+                </th>
+
               </tr>
 
             </thead>
 
             <tbody>
 
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const isExpanded =
+                  !!expandedOrders[order.id]
 
-                <tr
-                  key={order.id}
-                  className="border-t"
-                >
-
-                  <td className="px-4 py-3">
-                    {order.productName ??
-                      'Plano'}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {order.userEmail ?? '—'}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {formatBRL(
-                      order.total_cents,
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {formatDate(
-                      order.created_at,
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3">
-
-                    <form
-                      className="flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault()
-
-                        const form =
-                          e.currentTarget
-
-                        handleAction(
-                          setOrderStatus,
-                          new FormData(form),
-                          form,
-                        )
-                      }}
+                return (
+                  <>
+                    <tr
+                      key={order.id}
+                      className="border-t"
                     >
 
-                      <input
-                        type="hidden"
-                        name="orderId"
-                        value={order.id}
-                      />
+                      <td className="px-4 py-3">
+                        {order.productName ??
+                          'Plano'}
+                      </td>
 
-                      <select
-                        name="status"
-                        defaultValue={
-                          order.status
-                        }
-                        disabled={isPending}
-                        className="h-9 rounded-md border bg-background px-2 text-sm"
-                      >
+                      <td className="px-4 py-3">
+                        {order.userEmail ?? '—'}
+                      </td>
 
-                        {[
-                          'pending',
-                          'paid',
-                          'delivered',
-                          'cancelled',
-                        ].map((status) => (
+                      <td className="px-4 py-3">
+                        {formatBRL(
+                          order.total_cents,
+                        )}
+                      </td>
 
-                          <option
-                            key={status}
-                            value={status}
+                      <td className="px-4 py-3">
+                        {formatDate(
+                          order.created_at,
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3">
+
+                        <form
+                          className="flex gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+
+                            const form =
+                              e.currentTarget
+
+                            handleAction(
+                              setOrderStatus,
+                              new FormData(form),
+                              form,
+                            )
+                          }}
+                        >
+
+                          <input
+                            type="hidden"
+                            name="orderId"
+                            value={order.id}
+                          />
+
+                          <select
+                            name="status"
+                            defaultValue={
+                              order.status
+                            }
+                            disabled={isPending}
+                            className="h-9 rounded-md border bg-background px-2 text-sm"
                           >
-                            {status}
-                          </option>
 
-                        ))}
+                            {[
+                              'pending',
+                              'paid',
+                              'delivered',
+                              'cancelled',
+                            ].map((status) => (
 
-                      </select>
+                              <option
+                                key={status}
+                                value={status}
+                              >
+                                {getOrderStatusLabel(
+                                  status,
+                                )}
+                              </option>
 
-                      <Button
-                        type="submit"
-                        size="sm"
-                        variant="secondary"
-                        disabled={isPending}
+                            ))}
+
+                          </select>
+
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="secondary"
+                            disabled={isPending}
+                          >
+                            Salvar
+                          </Button>
+
+                        </form>
+
+                      </td>
+
+                      <td className="px-4 py-3">
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            isExpanded
+                              ? 'default'
+                              : 'outline'
+                          }
+                          onClick={() =>
+                            toggleOrder(
+                              order.id,
+                            )
+                          }
+                        >
+                          {isExpanded
+                            ? 'Fechar'
+                            : 'Ver detalhes'}
+                        </Button>
+
+                      </td>
+
+                    </tr>
+
+                    {isExpanded && (
+                      <tr
+                        key={`${order.id}-details`}
+                        className="border-t bg-card/40"
                       >
-                        Salvar
-                      </Button>
 
-                    </form>
+                        <td
+                          colSpan={6}
+                          className="p-0"
+                        >
 
-                  </td>
+                          <div className="p-5">
 
-                </tr>
-              ))}
+                            {/* CABEÇALHO DO PEDIDO */}
+
+                            <div className="rounded-xl border border-border/60 bg-background p-5">
+
+                              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+
+                                <div>
+
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Detalhes do pedido
+                                  </p>
+
+                                  <p className="mt-1 break-all font-mono text-sm font-semibold">
+                                    #{order.id}
+                                  </p>
+
+                                </div>
+
+                                <span className="inline-flex w-fit rounded-full border border-border px-3 py-1 text-xs font-bold">
+                                  {getOrderStatusLabel(
+                                    order.status,
+                                  )}
+                                </span>
+
+                              </div>
+
+                              {/* INFORMAÇÕES */}
+
+                              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Cliente
+                                  </p>
+
+                                  <p className="mt-1 break-all text-sm font-medium">
+                                    {order.userName ??
+                                      'Não informado'}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    E-mail
+                                  </p>
+
+                                  <p className="mt-1 break-all text-sm font-medium">
+                                    {order.userEmail ??
+                                      '—'}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Produto
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium">
+                                    {order.productName ??
+                                      'Plano'}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Quantidade
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium">
+                                    {order.quantity}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Valor
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-semibold">
+                                    {formatBRL(
+                                      order.total_cents,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Comprado em
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium">
+                                    {formatDate(
+                                      order.created_at,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Códigos vinculados
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium">
+                                    {order.codes.length}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    ID do pedido
+                                  </p>
+
+                                  <p className="mt-1 break-all font-mono text-xs">
+                                    {order.id}
+                                  </p>
+                                </div>
+
+                              </div>
+
+                            </div>
+
+
+                            {/* CÓDIGOS DO PEDIDO */}
+
+                            <div className="mt-5">
+
+                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
+                                <div>
+
+                                  <h3 className="text-base font-semibold">
+                                    Códigos do pedido
+                                  </h3>
+
+                                  <p className="text-xs text-muted-foreground">
+                                    Todos os códigos vinculados a esta compra.
+                                  </p>
+
+                                </div>
+
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  {order.codes.length}{' '}
+                                  {order.codes.length === 1
+                                    ? 'código'
+                                    : 'códigos'}
+                                </span>
+
+                              </div>
+
+
+                              {order.codes.length === 0 ? (
+
+                                <div className="mt-3 rounded-xl border border-dashed border-border p-5 text-center">
+
+                                  <p className="text-sm font-medium">
+                                    Nenhum código vinculado
+                                  </p>
+
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Este pedido ainda não possui códigos associados.
+                                  </p>
+
+                                </div>
+
+                              ) : (
+
+                                <div className="mt-3 space-y-2">
+
+                                  {order.codes.map(
+                                    (code) => (
+                                      <div
+                                        key={code.id}
+                                        className="flex flex-col gap-3 rounded-lg border border-border/60 bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                                      >
+
+                                        <div className="min-w-0">
+
+                                          <code className="break-all rounded bg-secondary px-2 py-1 font-mono text-sm">
+                                            {code.code}
+                                          </code>
+
+                                          <p className="mt-2 text-xs text-muted-foreground">
+                                            Comprado em{' '}
+                                            {formatDate(
+                                              code.assigned_at ??
+                                                order.created_at,
+                                            )}
+                                          </p>
+
+                                        </div>
+
+                                        <div className="flex shrink-0 items-center gap-3">
+
+                                          <span
+                                            className={`rounded-full border px-2 py-1 text-[10px] font-bold ${getCodeStatusClasses(
+                                              code.status,
+                                            )}`}
+                                          >
+                                            {getCodeStatusLabel(
+                                              code.status,
+                                            )}
+                                          </span>
+
+                                        </div>
+
+                                      </div>
+                                    ),
+                                  )}
+
+                                </div>
+
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                      </tr>
+                    )}
+                  </>
+                )
+              })}
 
             </tbody>
 
