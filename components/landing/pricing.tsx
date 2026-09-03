@@ -1,6 +1,11 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Check,
@@ -160,6 +165,24 @@ export function Pricing({
     useState<string | null>(null)
 
   /*
+   * ============================================================
+   * IDEMPOTENCY KEY
+   * ============================================================
+   *
+   * Mantemos a chave em um ref para que ela permaneça
+   * durante a mesma operação de compra.
+   *
+   * Isso é importante caso aconteça um erro de rede:
+   *
+   * 1ª tentativa -> chave ABC
+   * 2ª tentativa -> chave ABC
+   *
+   * A API poderá reconhecer que é a mesma operação.
+   */
+  const idempotencyKeyRef =
+    useRef<string | null>(null)
+
+  /*
    * Produto base.
    */
   const product =
@@ -221,8 +244,13 @@ export function Pricing({
     )
 
     /*
-     * Ao alterar a quantidade, removemos
-     * uma mensagem antiga de rate limit.
+     * Alterar a quantidade significa iniciar
+     * uma nova operação lógica.
+     */
+    idempotencyKeyRef.current = null
+
+    /*
+     * Remove mensagem antiga de rate limit.
      */
     setRateLimitMessage(null)
   }
@@ -251,7 +279,7 @@ export function Pricing({
     }
 
     /*
-     * Limpa a mensagem anterior antes de uma nova tentativa.
+     * Limpa a mensagem anterior.
      */
     setRateLimitMessage(null)
 
@@ -314,11 +342,32 @@ export function Pricing({
       String(parsedQuantity),
     )
 
+    /*
+     * ==========================================================
+     * GERAR IDEMPOTENCY KEY
+     * ==========================================================
+     *
+     * Se ainda não existe uma chave para esta operação,
+     * criamos uma nova.
+     *
+     * Se já existe, reutilizamos a mesma.
+     */
+    if (
+      !idempotencyKeyRef.current
+    ) {
+      idempotencyKeyRef.current =
+        crypto.randomUUID()
+    }
+
+    const idempotencyKey =
+      idempotencyKeyRef.current
+
     console.log(
       'Iniciando compra:',
       {
         productId: product.id,
         quantity: parsedQuantity,
+        idempotencyKey,
         totalCents:
           getUnitPriceCents(
             parsedQuantity,
@@ -331,15 +380,6 @@ export function Pricing({
      * ==========================================================
      * API /api/orders
      * ==========================================================
-     *
-     * O servidor valida:
-     *
-     * - autenticação
-     * - quantidade
-     * - rate limit
-     * - produto
-     * - preço
-     * - Mercado Pago
      */
 
     startTransition(async () => {
@@ -351,6 +391,13 @@ export function Pricing({
             headers: {
               'Content-Type':
                 'application/json',
+
+              /*
+               * Chave de idempotência enviada
+               * para o backend.
+               */
+              'Idempotency-Key':
+                idempotencyKey,
             },
             body: JSON.stringify({
               productId:
@@ -391,19 +438,22 @@ export function Pricing({
           const message =
             `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`
 
-          /*
-           * Mensagem persistente dentro do card.
-           */
           setRateLimitMessage(
             message,
           )
 
-          /*
-           * Também tentamos mostrar toast.
-           */
           toast.error(
             message,
           )
+
+          /*
+           * Nenhum pedido foi criado.
+           *
+           * Portanto, a próxima compra poderá
+           * receber uma nova chave.
+           */
+          idempotencyKeyRef.current =
+            null
 
           return
         }
@@ -418,13 +468,6 @@ export function Pricing({
           response.ok &&
           res.ok
         ) {
-          /*
-           * Remove eventual mensagem antiga.
-           */
-          setRateLimitMessage(
-            null,
-          )
-
           console.log(
             'Pagamento criado:',
             res,
@@ -443,8 +486,23 @@ export function Pricing({
             'pending',
           )
 
+          /*
+           * A operação terminou com sucesso.
+           *
+           * A próxima compra deverá possuir
+           * uma nova Idempotency-Key.
+           */
+          idempotencyKeyRef.current =
+            null
+
+          setRateLimitMessage(
+            null,
+          )
+
           toast.success(
-            'Pagamento PIX gerado com sucesso!',
+            res.idempotent
+              ? 'Pedido recuperado com sucesso!'
+              : 'Pagamento PIX gerado com sucesso!',
           )
 
           return
@@ -468,6 +526,25 @@ export function Pricing({
 
         /*
          * ========================================================
+         * ERRO 409
+         * ========================================================
+         *
+         * Pode ocorrer quando uma operação já existe
+         * mas ainda está sendo processada.
+         */
+        if (
+          response.status === 409
+        ) {
+          toast.error(
+            res.error ??
+              'Esta operação já possui um pedido em processamento.',
+          )
+
+          return
+        }
+
+        /*
+         * ========================================================
          * OUTRO ERRO
          * ========================================================
          */
@@ -482,13 +559,22 @@ export function Pricing({
             'Não foi possível criar o pedido.',
         )
       } catch (error) {
+        /*
+         * IMPORTANTE:
+         *
+         * Em caso de erro de rede, NÃO apagamos
+         * a Idempotency-Key.
+         *
+         * Se o usuário tentar novamente, a mesma
+         * chave será reutilizada.
+         */
         console.error(
           'Erro inesperado:',
           error,
         )
 
         toast.error(
-          'Ocorreu um erro inesperado ao gerar o pagamento.',
+          'Ocorreu um erro inesperado ao gerar o pagamento. Tente novamente.',
         )
       }
     })
@@ -773,10 +859,6 @@ export function Pricing({
                         value,
                       )
 
-                      /*
-                       * Quando o valor é válido,
-                       * atualizamos "quantity".
-                       */
                       if (
                         isValidQuantityInput(
                           value,
@@ -787,9 +869,12 @@ export function Pricing({
                         )
 
                         /*
-                         * Uma nova quantidade válida
-                         * limpa o aviso de rate limit.
+                         * Alterou a quantidade:
+                         * nova operação.
                          */
+                        idempotencyKeyRef.current =
+                          null
+
                         setRateLimitMessage(
                           null,
                         )
