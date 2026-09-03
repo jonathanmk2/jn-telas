@@ -81,7 +81,7 @@ export default async function AdminPage() {
     admin
       .from('activation_codes')
       .select(
-        'id, code, status, created_at, assigned_at, user_id, product_id',
+        'id, code, status, created_at, assigned_at, user_id, product_id, order_id',
       )
       .order('created_at', {
         ascending: false,
@@ -210,6 +210,8 @@ export default async function AdminPage() {
           product?.name ?? null,
         productId:
           code.product_id ?? null,
+        orderId:
+          code.order_id ?? null,
       }
     },
   )
