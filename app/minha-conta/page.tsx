@@ -5,8 +5,6 @@ import {
   ChevronRight,
   Home,
   KeyRound,
-  LayoutDashboard,
-  LogOut,
   PackageCheck,
   Shield,
   ShieldCheck,
@@ -98,6 +96,38 @@ function getStatusClasses(status: string) {
 
     case 'cancelled':
     case 'canceled':
+      return 'border-red-500/20 bg-red-500/10 text-red-600'
+
+    default:
+      return 'border-border bg-muted text-muted-foreground'
+  }
+}
+
+function getCodeStatusLabel(status: string) {
+  switch (status) {
+    case 'active':
+      return 'ATIVO'
+
+    case 'used':
+      return 'USADO'
+
+    case 'inactive':
+      return 'DESATIVADO'
+
+    default:
+      return status.toUpperCase()
+  }
+}
+
+function getCodeStatusClasses(status: string) {
+  switch (status) {
+    case 'active':
+      return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+
+    case 'used':
+      return 'border-orange-500/20 bg-orange-500/10 text-orange-600'
+
+    case 'inactive':
       return 'border-red-500/20 bg-red-500/10 text-red-600'
 
     default:
@@ -476,9 +506,15 @@ export default async function MinhaContaPage() {
                                   </p>
                                 </div>
 
-                                <div className="flex shrink-0 items-center gap-4">
-                                  <span className="whitespace-nowrap text-[10px] font-semibold text-emerald-600">
-                                    Ativo
+                                <div className="flex shrink-0 items-center gap-3">
+                                  <span
+                                    className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-semibold ${getCodeStatusClasses(
+                                      item.status,
+                                    )}`}
+                                  >
+                                    {getCodeStatusLabel(
+                                      item.status,
+                                    )}
                                   </span>
 
                                   <CopyButton code={item.code} />
@@ -524,9 +560,13 @@ export default async function MinhaContaPage() {
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-4">
-                      <span className="whitespace-nowrap text-[10px] font-semibold text-emerald-600">
-                        Ativo
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span
+                        className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-semibold ${getCodeStatusClasses(
+                          item.status,
+                        )}`}
+                      >
+                        {getCodeStatusLabel(item.status)}
                       </span>
 
                       <CopyButton code={item.code} />
