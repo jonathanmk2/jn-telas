@@ -37,6 +37,7 @@ type Code = {
   userEmail: string | null
   productName: string | null
   productId: string | null
+  orderId: string | null
 }
 
 type Order = {
@@ -81,6 +82,12 @@ type SyncResult =
       error: string
     }
 
+type CodeFilter =
+  | 'all'
+  | 'available'
+  | 'delivered'
+  | 'used'
+
 export function AdminDashboard({
   customers,
   codes,
@@ -104,6 +111,18 @@ export function AdminDashboard({
     useState<Extract<SyncResult, { ok: true }> | null>(
       null,
     )
+
+  /*
+   * =========================================================
+   * BUSCA E FILTROS
+   * =========================================================
+   */
+
+  const [codeSearch, setCodeSearch] =
+    useState('')
+
+  const [codeFilter, setCodeFilter] =
+    useState<CodeFilter>('all')
 
   function handleAction(
     action: (
@@ -214,6 +233,12 @@ export function AdminDashboard({
     })
   }
 
+  /*
+   * =========================================================
+   * ESTATÍSTICAS
+   * =========================================================
+   */
+
   const stats = useMemo(() => {
     const total = codes.length
 
@@ -246,6 +271,12 @@ export function AdminDashboard({
     }
   }, [codes])
 
+  /*
+   * =========================================================
+   * CÓDIGOS
+   * =========================================================
+   */
+
   const availableCodes = useMemo(
     () =>
       codes.filter(
@@ -264,6 +295,146 @@ export function AdminDashboard({
       ),
     [codes],
   )
+
+  /*
+   * =========================================================
+   * CÓDIGOS FILTRADOS
+   *
+   * Busca por:
+   * - código
+   * - cliente/e-mail
+   * - pedido
+   * =========================================================
+   */
+
+  const filteredCodes = useMemo(() => {
+    const search = codeSearch
+      .trim()
+      .toLowerCase()
+
+    return codes.filter((code) => {
+      /*
+       * FILTRO POR STATUS
+       */
+
+      if (codeFilter === 'available') {
+        if (
+          code.status !== 'active' ||
+          !!code.user_id
+        ) {
+          return false
+        }
+      }
+
+      if (codeFilter === 'delivered') {
+        if (!code.user_id) {
+          return false
+        }
+      }
+
+      if (codeFilter === 'used') {
+        if (code.status !== 'used') {
+          return false
+        }
+      }
+
+      /*
+       * SEM BUSCA
+       */
+
+      if (!search) {
+        return true
+      }
+
+      /*
+       * CAMPOS PESQUISÁVEIS
+       */
+
+      const searchableText = [
+        code.code,
+        code.userEmail,
+        code.orderId,
+        code.productName,
+        code.user_id,
+        code.id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return searchableText.includes(search)
+    })
+  }, [codes, codeFilter, codeSearch])
+
+  /*
+   * =========================================================
+   * CONTADORES DOS FILTROS
+   * =========================================================
+   */
+
+  const filterCounts = useMemo(() => {
+    return {
+      all: codes.length,
+
+      available: codes.filter(
+        (code) =>
+          code.status === 'active' &&
+          !code.user_id,
+      ).length,
+
+      delivered: codes.filter(
+        (code) =>
+          !!code.user_id,
+      ).length,
+
+      used: codes.filter(
+        (code) =>
+          code.status === 'used',
+      ).length,
+    }
+  }, [codes])
+
+  /*
+   * =========================================================
+   * STATUS VISUAL
+   * =========================================================
+   */
+
+  function getCodeStatusLabel(
+    status: string,
+  ) {
+    switch (status) {
+      case 'used':
+        return 'USADO'
+
+      case 'active':
+        return 'ATIVO'
+
+      case 'inactive':
+        return 'DESATIVADO'
+
+      default:
+        return status.toUpperCase()
+    }
+  }
+
+  function getCodeStatusClasses(
+    status: string,
+  ) {
+    switch (status) {
+      case 'used':
+        return 'border-orange-500/20 bg-orange-500/10 text-orange-600'
+
+      case 'active':
+        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+
+      case 'inactive':
+        return 'border-red-500/20 bg-red-500/10 text-red-600'
+
+      default:
+        return 'border-border bg-muted text-muted-foreground'
+    }
+  }
 
   return (
     <div className="space-y-10">
@@ -494,7 +665,6 @@ CODIGO-003`}
 
         </div>
 
-
         <div className="mt-3 space-y-3">
 
           {availableCodes.length === 0 ? (
@@ -548,10 +718,7 @@ CODIGO-003`}
 
                   </div>
 
-
                   <div className="flex flex-wrap gap-2">
-
-                    {/* ATRIBUIR MANUALMENTE */}
 
                     <form
                       onSubmit={(e) => {
@@ -610,9 +777,6 @@ CODIGO-003`}
 
                     </form>
 
-
-                    {/* STATUS */}
-
                     <form
                       onSubmit={(e) => {
                         e.preventDefault()
@@ -656,9 +820,6 @@ CODIGO-003`}
                       </Button>
 
                     </form>
-
-
-                    {/* EXCLUIR */}
 
                     <Button
                       type="button"
@@ -820,9 +981,6 @@ G0V7S4N0M5M6C0R5`}
 
           </form>
 
-
-          {/* RESULTADO DA SINCRONIZAÇÃO */}
-
           {syncResult && (
             <div className="mt-4 rounded-lg border border-border bg-card p-4">
 
@@ -888,6 +1046,10 @@ G0V7S4N0M5M6C0R5`}
         </div>
 
 
+        {/* ===================================================
+            LISTA DE ENTREGUES
+        ==================================================== */}
+
         <div className="mt-3 space-y-3">
 
           {deliveredCodes.length === 0 ? (
@@ -907,8 +1069,6 @@ G0V7S4N0M5M6C0R5`}
 
                 <div className="grid gap-4 lg:grid-cols-[1.2fr_1.5fr_1fr_1fr_auto] lg:items-center">
 
-                  {/* CÓDIGO */}
-
                   <div>
 
                     <p className="mb-1 text-xs text-muted-foreground">
@@ -920,9 +1080,6 @@ G0V7S4N0M5M6C0R5`}
                     </code>
 
                   </div>
-
-
-                  {/* CLIENTE */}
 
                   <div>
 
@@ -937,9 +1094,6 @@ G0V7S4N0M5M6C0R5`}
 
                   </div>
 
-
-                  {/* PRODUTO */}
-
                   <div>
 
                     <p className="mb-1 text-xs text-muted-foreground">
@@ -952,9 +1106,6 @@ G0V7S4N0M5M6C0R5`}
                     </p>
 
                   </div>
-
-
-                  {/* DATA DA COMPRA */}
 
                   <div>
 
@@ -972,15 +1123,17 @@ G0V7S4N0M5M6C0R5`}
 
                   </div>
 
-
-                  {/* STATUS */}
-
                   <div className="flex flex-col gap-2 lg:items-end">
 
-                    <StatusBadge
-                      status={code.status}
-                      type="code"
-                    />
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[10px] font-bold ${getCodeStatusClasses(
+                        code.status,
+                      )}`}
+                    >
+                      {getCodeStatusLabel(
+                        code.status,
+                      )}
+                    </span>
 
                     {code.status !== 'used' && (
                       <form
@@ -1040,6 +1193,295 @@ G0V7S4N0M5M6C0R5`}
             ))
 
           )}
+
+        </div>
+
+      </section>
+
+
+      {/* =====================================================
+          GERENCIAMENTO / BUSCA DE CÓDIGOS
+      ====================================================== */}
+
+      <section>
+
+        <div className="rounded-xl border border-border/60 bg-card p-5">
+
+          <div className="flex flex-col gap-1">
+
+            <h2 className="text-lg font-semibold">
+              Gerenciar códigos
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Pesquise por código, cliente, e-mail ou pedido
+              e filtre por situação.
+            </p>
+
+          </div>
+
+
+          {/* BUSCA */}
+
+          <div className="mt-4">
+
+            <Label htmlFor="code-search">
+              Buscar
+            </Label>
+
+            <input
+              id="code-search"
+              type="text"
+              value={codeSearch}
+              onChange={(e) =>
+                setCodeSearch(
+                  e.target.value,
+                )
+              }
+              placeholder="Código, cliente, e-mail ou ID do pedido..."
+              className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+            />
+
+          </div>
+
+
+          {/* FILTROS */}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                codeFilter === 'all'
+                  ? 'default'
+                  : 'outline'
+              }
+              onClick={() =>
+                setCodeFilter('all')
+              }
+            >
+              Todos ({filterCounts.all})
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                codeFilter === 'available'
+                  ? 'default'
+                  : 'outline'
+              }
+              onClick={() =>
+                setCodeFilter('available')
+              }
+            >
+              Disponíveis ({filterCounts.available})
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                codeFilter === 'delivered'
+                  ? 'default'
+                  : 'outline'
+              }
+              onClick={() =>
+                setCodeFilter('delivered')
+              }
+            >
+              Entregues ({filterCounts.delivered})
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                codeFilter === 'used'
+                  ? 'default'
+                  : 'outline'
+              }
+              onClick={() =>
+                setCodeFilter('used')
+              }
+            >
+              Usados ({filterCounts.used})
+            </Button>
+
+          </div>
+
+
+          {/* RESULTADO */}
+
+          <div className="mt-5 flex items-center justify-between gap-3">
+
+            <p className="text-sm text-muted-foreground">
+              {filteredCodes.length}{' '}
+              {filteredCodes.length === 1
+                ? 'resultado'
+                : 'resultados'}
+            </p>
+
+            {(codeSearch ||
+              codeFilter !== 'all') && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setCodeSearch('')
+                  setCodeFilter('all')
+                }}
+              >
+                Limpar filtros
+              </Button>
+            )}
+
+          </div>
+
+
+          {/* LISTA */}
+
+          <div className="mt-3 space-y-3">
+
+            {filteredCodes.length === 0 ? (
+
+              <div className="rounded-xl border border-dashed border-border p-6 text-center">
+
+                <p className="text-sm font-medium">
+                  Nenhum código encontrado.
+                </p>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tente outro termo ou remova os filtros.
+                </p>
+
+              </div>
+
+            ) : (
+
+              filteredCodes.map((code) => (
+
+                <div
+                  key={code.id}
+                  className="rounded-xl border border-border/60 bg-background p-4"
+                >
+
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
+                    <div className="min-w-0">
+
+                      <div className="flex flex-wrap items-center gap-2">
+
+                        <code className="rounded bg-secondary px-2 py-1 font-mono text-sm">
+                          {code.code}
+                        </code>
+
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[10px] font-bold ${getCodeStatusClasses(
+                            code.status,
+                          )}`}
+                        >
+                          {getCodeStatusLabel(
+                            code.status,
+                          )}
+                        </span>
+
+                      </div>
+
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+
+                        {code.userEmail && (
+                          <p>
+                            Cliente:{' '}
+                            <span className="font-medium text-foreground">
+                              {code.userEmail}
+                            </span>
+                          </p>
+                        )}
+
+                        {code.orderId && (
+                          <p>
+                            Pedido:{' '}
+                            <span className="font-mono font-medium text-foreground">
+                              #{code.orderId
+                                .replaceAll('-', '')
+                                .slice(0, 8)
+                                .toUpperCase()}
+                            </span>
+                          </p>
+                        )}
+
+                        <p>
+                          {code.assigned_at
+                            ? `Comprado em ${formatDate(
+                                code.assigned_at,
+                              )}`
+                            : `Adicionado em ${formatDate(
+                                code.created_at,
+                              )}`}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+
+                      {code.status !== 'used' && (
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault()
+
+                            const form =
+                              e.currentTarget
+
+                            const formData =
+                              new FormData(form)
+
+                            formData.set(
+                              'status',
+                              'used',
+                            )
+
+                            handleAction(
+                              setCodeStatus,
+                              formData,
+                              form,
+                            )
+                          }}
+                        >
+
+                          <input
+                            type="hidden"
+                            name="codeId"
+                            value={code.id}
+                          />
+
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="outline"
+                            disabled={isPending}
+                          >
+                            Marcar como usado
+                          </Button>
+
+                        </form>
+                      )}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              ))
+
+            )}
+
+          </div>
 
         </div>
 
@@ -1183,7 +1625,6 @@ G0V7S4N0M5M6C0R5`}
                   </td>
 
                 </tr>
-
               ))}
 
             </tbody>
