@@ -36,7 +36,11 @@ async function requireAdmin(): Promise<string | null> {
     .single()
 
   if (error) {
-    console.error('Erro ao verificar administrador:', error)
+    console.error(
+      'Erro ao verificar administrador:',
+      error,
+    )
+
     return null
   }
 
@@ -260,7 +264,7 @@ export async function assignCode(
 }
 
 /* =========================================================
-   ATIVAR / DESATIVAR CÓDIGO
+   ATIVAR / DESATIVAR / MARCAR COMO USADO
 ========================================================= */
 
 export async function setCodeStatus(
@@ -283,10 +287,20 @@ export async function setCodeStatus(
     'status',
   ) as string
 
+  /*
+   * Status permitidos:
+   *
+   * active   = disponível
+   * inactive = desativado
+   * used     = usado
+   */
+
   if (
-    !['active', 'inactive'].includes(
-      status,
-    )
+    ![
+      'active',
+      'inactive',
+      'used',
+    ].includes(status)
   ) {
     return {
       ok: false,
@@ -316,6 +330,15 @@ export async function setCodeStatus(
     }
   }
 
+  /*
+   * Atualiza o Admin e também a área
+   * do cliente.
+   *
+   * Assim, quando um código for marcado
+   * como usado no Admin, o cliente poderá
+   * receber o novo status no pedido.
+   */
+
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
 
@@ -324,7 +347,9 @@ export async function setCodeStatus(
     message:
       status === 'active'
         ? 'Código ativado.'
-        : 'Código desativado.',
+        : status === 'inactive'
+          ? 'Código desativado.'
+          : 'Código marcado como usado.',
   }
 }
 
