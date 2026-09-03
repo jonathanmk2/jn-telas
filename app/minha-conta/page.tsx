@@ -105,11 +105,11 @@ function getStatusClasses(status: string) {
 
 function getCodeStatusLabel(status: string) {
   switch (status) {
-    case 'active':
-      return 'ATIVO'
-
     case 'used':
       return 'USADO'
+
+    case 'active':
+      return 'ATIVO'
 
     case 'inactive':
       return 'DESATIVADO'
@@ -121,11 +121,11 @@ function getCodeStatusLabel(status: string) {
 
 function getCodeStatusClasses(status: string) {
   switch (status) {
-    case 'active':
-      return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
-
     case 'used':
       return 'border-orange-500/20 bg-orange-500/10 text-orange-600'
+
+    case 'active':
+      return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
 
     case 'inactive':
       return 'border-red-500/20 bg-red-500/10 text-red-600'
@@ -244,10 +244,8 @@ export default async function MinhaContaPage() {
             </h1>
           </div>
 
-          {/* BOTÕES DO TOPO */}
           <div className="flex shrink-0 items-center gap-2">
 
-            {/* HOME */}
             <Link
               href="/"
               aria-label="Voltar para Home"
@@ -260,7 +258,6 @@ export default async function MinhaContaPage() {
               </span>
             </Link>
 
-            {/* ADMIN — SOMENTE ADMINISTRADORES */}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -429,8 +426,10 @@ export default async function MinhaContaPage() {
                               : 'telas'}
                           </p>
 
+                          {/* DATA DA COMPRA */}
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                             <span>
+                              Comprado em{' '}
                               {formatDate(order.created_at)}
                             </span>
 
@@ -454,6 +453,7 @@ export default async function MinhaContaPage() {
 
                     {/* CÓDIGOS DO PEDIDO */}
                     <div className="border-t border-border bg-muted/20 p-3 sm:p-4">
+
                       <div className="mb-3 flex items-center justify-between gap-3">
 
                         <div className="flex min-w-0 items-center gap-2">
@@ -493,36 +493,49 @@ export default async function MinhaContaPage() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {orderCodes.map((item) => (
-                            <div
-                              key={item.id}
-                              className="rounded-xl border border-border bg-background p-3"
-                            >
-                              <div className="flex items-center gap-3">
 
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate font-mono text-sm font-semibold tracking-wide">
-                                    {item.code}
-                                  </p>
+                          {orderCodes.map((item) => {
+
+                            const codeStatus =
+                              item.status || 'active'
+
+                            return (
+                              <div
+                                key={item.id}
+                                className="rounded-xl border border-border bg-background p-3"
+                              >
+                                <div className="flex items-center gap-3">
+
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate font-mono text-sm font-semibold tracking-wide">
+                                      {item.code}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex shrink-0 items-center gap-2">
+
+                                    {/* STATUS DO CÓDIGO */}
+                                    <span
+                                      className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-bold ${getCodeStatusClasses(
+                                        codeStatus,
+                                      )}`}
+                                    >
+                                      {getCodeStatusLabel(
+                                        codeStatus,
+                                      )}
+                                    </span>
+
+                                    <CopyButton
+                                      code={item.code}
+                                    />
+
+                                  </div>
+
                                 </div>
-
-                                <div className="flex shrink-0 items-center gap-3">
-                                  <span
-                                    className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-semibold ${getCodeStatusClasses(
-                                      item.status,
-                                    )}`}
-                                  >
-                                    {getCodeStatusLabel(
-                                      item.status,
-                                    )}
-                                  </span>
-
-                                  <CopyButton code={item.code} />
-                                </div>
-
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
+
                         </div>
                       )}
                     </div>
@@ -536,6 +549,7 @@ export default async function MinhaContaPage() {
         {/* CÓDIGOS ANTIGOS */}
         {oldCodes.length > 0 && (
           <section className="mt-7">
+
             <div className="mb-3">
               <h2 className="text-base font-bold sm:text-lg">
                 Outros códigos
@@ -547,11 +561,13 @@ export default async function MinhaContaPage() {
             </div>
 
             <div className="space-y-2">
+
               {oldCodes.map((item) => (
                 <div
                   key={item.id}
                   className="rounded-xl border border-border bg-card p-3 shadow-sm"
                 >
+
                   <div className="flex items-center gap-3">
 
                     <div className="min-w-0 flex-1">
@@ -560,21 +576,27 @@ export default async function MinhaContaPage() {
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-2">
+
                       <span
-                        className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-semibold ${getCodeStatusClasses(
+                        className={`whitespace-nowrap rounded-full border px-2 py-1 text-[10px] font-bold ${getCodeStatusClasses(
                           item.status,
                         )}`}
                       >
-                        {getCodeStatusLabel(item.status)}
+                        {getCodeStatusLabel(
+                          item.status,
+                        )}
                       </span>
 
                       <CopyButton code={item.code} />
+
                     </div>
 
                   </div>
+
                 </div>
               ))}
+
             </div>
           </section>
         )}
