@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -10,6 +10,7 @@ import {
   deleteCode,
   setCodeStatus,
   setOrderStatus,
+  syncUsedCodes,
 } from '@/app/actions/admin'
 
 import { Button } from '@/components/ui/button'
@@ -67,6 +68,19 @@ type ActionResult =
       error: string
     }
 
+type SyncResult =
+  | {
+      ok: true
+      found: number
+      updated: number
+      notFound: string[]
+      message: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export function AdminDashboard({
   customers,
   codes,
@@ -83,6 +97,13 @@ export function AdminDashboard({
   const router = useRouter()
 
   const [isPending, startTransition] = useTransition()
+  const [isSyncing, startSyncTransition] =
+    useTransition()
+
+  const [syncResult, setSyncResult] =
+    useState<Extract<SyncResult, { ok: true }> | null>(
+      null,
+    )
 
   function handleAction(
     action: (
@@ -118,6 +139,76 @@ export function AdminDashboard({
 
           toast.error(
             'Ocorreu um erro inesperado.',
+          )
+        })
+    })
+  }
+
+  async function handleCopyAllDelivered() {
+    const deliveredCodes = codes
+      .filter((code) => !!code.user_id)
+      .map((code) => code.code)
+      .filter(Boolean)
+
+    if (deliveredCodes.length === 0) {
+      toast.error(
+        'Não existem códigos entregues para copiar.',
+      )
+      return
+    }
+
+    const text = deliveredCodes.join('\n')
+
+    try {
+      await navigator.clipboard.writeText(text)
+
+      toast.success(
+        `${deliveredCodes.length} código(s) entregues copiado(s).`,
+      )
+    } catch (error) {
+      console.error(
+        'Erro ao copiar códigos entregues:',
+        error,
+      )
+
+      toast.error(
+        'Não foi possível copiar os códigos. Verifique a permissão da área de transferência.',
+      )
+    }
+  }
+
+  function handleSyncUsedCodes(
+    form: HTMLFormElement,
+  ) {
+    const formData = new FormData(form)
+
+    setSyncResult(null)
+
+    startSyncTransition(() => {
+      void syncUsedCodes(formData)
+        .then((result) => {
+          if (!result.ok) {
+            toast.error(result.error)
+            return
+          }
+
+          setSyncResult(result)
+
+          toast.success(
+            result.message,
+          )
+
+          form.reset()
+          router.refresh()
+        })
+        .catch((error) => {
+          console.error(
+            'Erro na sincronização de códigos:',
+            error,
+          )
+
+          toast.error(
+            'Ocorreu um erro inesperado ao sincronizar os códigos.',
           )
         })
     })
@@ -622,7 +713,7 @@ CODIGO-003`}
 
       <section>
 
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
           <div>
 
@@ -637,9 +728,162 @@ CODIGO-003`}
 
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            {deliveredCodes.length} entregues
+          <div className="flex flex-wrap items-center gap-2">
+
+            <div className="text-sm text-muted-foreground">
+              {deliveredCodes.length} entregues
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={
+                isPending ||
+                deliveredCodes.length === 0
+              }
+              onClick={handleCopyAllDelivered}
+            >
+              Copiar todos entregues
+            </Button>
+
           </div>
+
+        </div>
+
+
+        {/* ===================================================
+            SINCRONIZAÇÃO DE CÓDIGOS USADOS
+        ==================================================== */}
+
+        <div className="mt-5 rounded-xl border border-orange-500/20 bg-orange-500/5 p-5">
+
+          <div>
+
+            <h3 className="text-base font-semibold">
+              Sincronizar códigos usados
+            </h3>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cole os códigos que já foram utilizados.
+              O sistema vai procurar somente códigos que
+              já existem no estoque e marcá-los como USADO.
+            </p>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Você pode colar um por linha, separados por
+              vírgula ou ponto e vírgula. Nenhum código novo
+              será criado.
+            </p>
+
+          </div>
+
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+
+              const form = e.currentTarget
+
+              handleSyncUsedCodes(form)
+            }}
+          >
+
+            <Label htmlFor="used-codes">
+              Códigos usados
+            </Label>
+
+            <textarea
+              id="used-codes"
+              name="codes"
+              required
+              disabled={isSyncing}
+              className="min-h-48 w-full rounded-md border bg-background p-3 font-mono text-sm"
+              placeholder={`B4L3I4Z6X1V0M8R2
+N0Y7K6N8D0G7H6F2
+G0V7S4N0M5M6C0R5`}
+            />
+
+            <div className="flex justify-end">
+
+              <Button
+                type="submit"
+                disabled={isSyncing}
+                variant="outline"
+              >
+                {isSyncing
+                  ? 'Sincronizando...'
+                  : 'Marcar códigos como usados'}
+              </Button>
+
+            </div>
+
+          </form>
+
+
+          {/* RESULTADO DA SINCRONIZAÇÃO */}
+
+          {syncResult && (
+            <div className="mt-4 rounded-lg border border-border bg-card p-4">
+
+              <p className="text-sm font-semibold">
+                Sincronização concluída
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Encontrados
+                  </p>
+
+                  <p className="text-lg font-bold">
+                    {syncResult.found}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Atualizados
+                  </p>
+
+                  <p className="text-lg font-bold text-orange-500">
+                    {syncResult.updated}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Não encontrados
+                  </p>
+
+                  <p className="text-lg font-bold text-red-500">
+                    {syncResult.notFound.length}
+                  </p>
+                </div>
+
+              </div>
+
+              {syncResult.notFound.length > 0 && (
+                <div className="mt-4">
+
+                  <p className="text-xs font-semibold text-red-500">
+                    Códigos não encontrados
+                  </p>
+
+                  <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-border bg-background p-3">
+
+                    <pre className="whitespace-pre-wrap break-all font-mono text-xs">
+                      {syncResult.notFound.join('\n')}
+                    </pre>
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          )}
 
         </div>
 
@@ -761,6 +1005,7 @@ CODIGO-003`}
                           )
                         }}
                       >
+
                         <input
                           type="hidden"
                           name="codeId"
@@ -777,6 +1022,7 @@ CODIGO-003`}
                             ? 'Atualizando...'
                             : 'Marcar como usado'}
                         </Button>
+
                       </form>
                     )}
 
