@@ -92,15 +92,6 @@ function getNextPriceMessage(
  *
  * Aceita SOMENTE números inteiros de 1 até 500.
  *
- * Aceita:
- * 1
- * 5
- * 10
- * 56
- * 100
- * 499
- * 500
- *
  * Rejeita:
  * 0
  * 00
@@ -157,6 +148,16 @@ export function Pricing({
    */
   const [quantityInput, setQuantityInput] =
     useState('1')
+
+  /*
+   * ============================================================
+   * RATE LIMIT
+   * ============================================================
+   *
+   * Mensagem persistente exibida quando a API retorna HTTP 429.
+   */
+  const [rateLimitMessage, setRateLimitMessage] =
+    useState<string | null>(null)
 
   /*
    * Produto base.
@@ -218,6 +219,12 @@ export function Pricing({
     setQuantityInput(
       String(newQuantity),
     )
+
+    /*
+     * Ao alterar a quantidade, removemos
+     * uma mensagem antiga de rate limit.
+     */
+    setRateLimitMessage(null)
   }
 
   /*
@@ -242,6 +249,11 @@ export function Pricing({
 
       return
     }
+
+    /*
+     * Limpa a mensagem anterior antes de uma nova tentativa.
+     */
+    setRateLimitMessage(null)
 
     /*
      * IMPORTANTE:
@@ -317,13 +329,17 @@ export function Pricing({
 
     /*
      * ==========================================================
-     * NOVO FLUXO:
-     *
-     * Agora o pedido passa pela API /api/orders.
-     *
-     * Isso permite que o servidor responda com HTTP 429
-     * quando o limite de pedidos for atingido.
+     * API /api/orders
      * ==========================================================
+     *
+     * O servidor valida:
+     *
+     * - autenticação
+     * - quantidade
+     * - rate limit
+     * - produto
+     * - preço
+     * - Mercado Pago
      */
 
     startTransition(async () => {
@@ -353,7 +369,7 @@ export function Pricing({
          * HTTP 429
          * ========================================================
          *
-         * Limite de 5 pedidos por minuto atingido.
+         * Limite de 5 tentativas por minuto atingido.
          */
         if (
           response.status === 429
@@ -372,8 +388,21 @@ export function Pricing({
               ? retryAfter
               : 60
 
+          const message =
+            `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`
+
+          /*
+           * Mensagem persistente dentro do card.
+           */
+          setRateLimitMessage(
+            message,
+          )
+
+          /*
+           * Também tentamos mostrar toast.
+           */
           toast.error(
-            `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`,
+            message,
           )
 
           return
@@ -389,6 +418,13 @@ export function Pricing({
           response.ok &&
           res.ok
         ) {
+          /*
+           * Remove eventual mensagem antiga.
+           */
+          setRateLimitMessage(
+            null,
+          )
+
           console.log(
             'Pagamento criado:',
             res,
@@ -733,15 +769,6 @@ export function Pricing({
                       const value =
                         event.target.value
 
-                      /*
-                       * Mantém exatamente o que
-                       * o usuário digitou.
-                       *
-                       * Exemplo:
-                       * 5e2 continua 5e2.
-                       * 501 continua 501.
-                       */
-
                       setQuantityInput(
                         value,
                       )
@@ -757,6 +784,14 @@ export function Pricing({
                       ) {
                         setQuantity(
                           Number(value),
+                        )
+
+                        /*
+                         * Uma nova quantidade válida
+                         * limpa o aviso de rate limit.
+                         */
+                        setRateLimitMessage(
+                          null,
                         )
                       }
                     }}
@@ -1004,6 +1039,25 @@ export function Pricing({
                 )}
               </Button>
 
+              {/* ==================================================
+                  AVISO DE RATE LIMIT
+                  ================================================== */}
+
+              {rateLimitMessage && (
+                <div
+                  role="alert"
+                  className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-center"
+                >
+                  <p className="text-sm font-semibold text-red-500">
+                    🚫 Limite de pedidos atingido
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {rateLimitMessage}
+                  </p>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -1196,7 +1250,6 @@ export function Pricing({
                 </Button>
 
               </div>
-
             )}
 
           </div>
