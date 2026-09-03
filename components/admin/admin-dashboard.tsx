@@ -141,11 +141,17 @@ export function AdminDashboard({
         code.status === 'inactive',
     ).length
 
+    const used = codes.filter(
+      (code) =>
+        code.status === 'used',
+    ).length
+
     return {
       total,
       available,
       delivered,
       inactive,
+      used,
     }
   }, [codes])
 
@@ -153,7 +159,8 @@ export function AdminDashboard({
     () =>
       codes.filter(
         (code) =>
-          !code.user_id,
+          !code.user_id &&
+          code.status === 'active',
       ),
     [codes],
   )
@@ -213,15 +220,21 @@ export function AdminDashboard({
 
           <div className="rounded-xl border border-border/60 bg-card p-5">
             <p className="text-sm text-muted-foreground">
-              Desativados
+              Usados
             </p>
 
-            <p className="mt-2 text-3xl font-bold">
-              {stats.inactive}
+            <p className="mt-2 text-3xl font-bold text-orange-500">
+              {stats.used}
             </p>
           </div>
 
         </div>
+
+        {stats.inactive > 0 && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {stats.inactive} código(s) desativado(s).
+          </p>
+        )}
       </section>
 
 
@@ -697,12 +710,12 @@ CODIGO-003`}
                   </div>
 
 
-                  {/* DATA */}
+                  {/* DATA DA COMPRA */}
 
                   <div>
 
                     <p className="mb-1 text-xs text-muted-foreground">
-                      Entregue em
+                      Comprado em
                     </p>
 
                     <p className="text-sm">
@@ -718,19 +731,66 @@ CODIGO-003`}
 
                   {/* STATUS */}
 
-                  <div className="flex lg:justify-end">
+                  <div className="flex flex-col gap-2 lg:items-end">
 
                     <StatusBadge
                       status={code.status}
                       type="code"
                     />
 
+                    {code.status !== 'used' && (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+
+                          const form =
+                            e.currentTarget
+
+                          const formData =
+                            new FormData(form)
+
+                          formData.set(
+                            'status',
+                            'used',
+                          )
+
+                          handleAction(
+                            setCodeStatus,
+                            formData,
+                            form,
+                          )
+                        }}
+                      >
+                        <input
+                          type="hidden"
+                          name="codeId"
+                          value={code.id}
+                        />
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                        >
+                          {isPending
+                            ? 'Atualizando...'
+                            : 'Marcar como usado'}
+                        </Button>
+                      </form>
+                    )}
+
+                    {code.status === 'used' && (
+                      <span className="text-xs font-medium text-orange-500">
+                        Código já utilizado
+                      </span>
+                    )}
+
                   </div>
 
                 </div>
 
               </div>
-
             ))
 
           )}
