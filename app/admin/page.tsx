@@ -13,11 +13,6 @@ export default async function AdminPage() {
    * =========================================================
    * PROTEÇÃO DO PAINEL ADMIN
    * =========================================================
-   *
-   * Primeiro verifica se existe usuário autenticado.
-   * Depois verifica se esse usuário possui is_admin = true.
-   *
-   * Essa proteção acontece no servidor.
    */
 
   const supabase = await createClient()
@@ -54,11 +49,6 @@ export default async function AdminPage() {
    * =========================================================
    * CLIENT ADMINISTRATIVO
    * =========================================================
-   *
-   * Os dados administrativos são carregados usando
-   * createAdminClient().
-   *
-   * Não alteramos RLS nem permissões do cliente comum.
    */
 
   const admin = createAdminClient()
@@ -90,7 +80,7 @@ export default async function AdminPage() {
     admin
       .from('orders')
       .select(
-        'id, status, total_cents, created_at, user_id, product_id',
+        'id, status, total_cents, quantity, created_at, user_id, product_id',
       )
       .order('created_at', {
         ascending: false,
@@ -169,10 +159,12 @@ export default async function AdminPage() {
       email: customer.email ?? null,
       full_name: customer.full_name ?? null,
       created_at: customer.created_at,
+
       codeCount: codes.filter(
         (code) =>
           code.user_id === customer.id,
       ).length,
+
       orderCount: orders.filter(
         (order) =>
           order.user_id === customer.id,
@@ -201,15 +193,22 @@ export default async function AdminPage() {
         code: code.code,
         status: code.status,
         created_at: code.created_at,
+
         assigned_at:
           code.assigned_at ?? null,
-        user_id: code.user_id ?? null,
+
+        user_id:
+          code.user_id ?? null,
+
         userEmail:
           customer?.email ?? null,
+
         productName:
           product?.name ?? null,
+
         productId:
           code.product_id ?? null,
+
         orderId:
           code.order_id ?? null,
       }
@@ -219,6 +218,9 @@ export default async function AdminPage() {
   /*
    * =========================================================
    * PEDIDOS
+   *
+   * Cada pedido recebe também os códigos vinculados
+   * através de activation_codes.order_id.
    * =========================================================
    */
 
@@ -232,15 +234,46 @@ export default async function AdminPage() {
         ? productMap.get(order.product_id)
         : null
 
+      const orderCodes = codes
+        .filter(
+          (code) =>
+            code.order_id === order.id,
+        )
+        .map((code) => ({
+          id: code.id,
+          code: code.code,
+          status: code.status,
+          created_at: code.created_at,
+          assigned_at:
+            code.assigned_at ?? null,
+        }))
+
       return {
         id: order.id,
         status: order.status,
         total_cents: order.total_cents,
+
+        quantity:
+          order.quantity ?? orderCodes.length,
+
         created_at: order.created_at,
+
+        userId:
+          order.user_id ?? null,
+
         userEmail:
           customer?.email ?? null,
+
+        userName:
+          customer?.full_name ?? null,
+
         productName:
           product?.name ?? null,
+
+        productId:
+          order.product_id ?? null,
+
+        codes: orderCodes,
       }
     },
   )
@@ -273,6 +306,7 @@ export default async function AdminPage() {
     )
     .map((customer) => ({
       id: customer.id,
+
       label:
         customer.email ??
         customer.full_name ??
@@ -287,6 +321,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-dvh bg-background">
+
       <DashboardNavbar
         user={{
           email:
@@ -297,7 +332,9 @@ export default async function AdminPage() {
       />
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
         <div className="mb-8">
+
           <h1 className="text-2xl font-bold tracking-tight">
             Painel Administrativo
           </h1>
@@ -305,6 +342,7 @@ export default async function AdminPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Gerencie clientes, códigos, estoque e pedidos.
           </p>
+
         </div>
 
         <AdminDashboard
@@ -314,7 +352,9 @@ export default async function AdminPage() {
           productOptions={productOptions}
           customerOptions={customerOptions}
         />
+
       </main>
+
     </div>
   )
 }
