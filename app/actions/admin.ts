@@ -15,6 +15,23 @@ type ActionResult =
     }
 
 /* =========================================================
+   RESULTADO DA SINCRONIZAÇÃO
+========================================================= */
+
+export type SyncUsedCodesResult =
+  | {
+      ok: true
+      found: number
+      updated: number
+      notFound: string[]
+      message: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+/* =========================================================
    VERIFICA SE O USUÁRIO É ADMIN
 ========================================================= */
 
@@ -74,6 +91,21 @@ function randomCode(): string {
 }
 
 /* =========================================================
+   NORMALIZA LISTA DE CÓDIGOS
+========================================================= */
+
+function normalizeCodes(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((code) => code.trim())
+        .filter(Boolean),
+    ),
+  )
+}
+
+/* =========================================================
    CRIAR CÓDIGOS
    ESTOQUE ÚNICO
 ========================================================= */
@@ -111,10 +143,7 @@ export async function createCodes(
   ===================================================== */
 
   if (customCodes) {
-    const codes = customCodes
-      .split(/[\n,;]+/)
-      .map((code) => code.trim())
-      .filter(Boolean)
+    const codes = normalizeCodes(customCodes)
 
     if (codes.length === 0) {
       return {
@@ -264,7 +293,7 @@ export async function assignCode(
 }
 
 /* =========================================================
-   ATIVAR / DESATIVAR / MARCAR COMO USADO
+   ATIVAR / DESATIVAR / USAR CÓDIGO
 ========================================================= */
 
 export async function setCodeStatus(
@@ -286,14 +315,6 @@ export async function setCodeStatus(
   const status = formData.get(
     'status',
   ) as string
-
-  /*
-   * Status permitidos:
-   *
-   * active   = disponível
-   * inactive = desativado
-   * used     = usado
-   */
 
   if (
     ![
@@ -330,26 +351,183 @@ export async function setCodeStatus(
     }
   }
 
+  revalidatePath('/admin')
+  revalidatePath('/minha-conta')
+
+  const messages: Record<string, string> = {
+    active: 'Código ativado.',
+    inactive: 'Código desativado.',
+    used: 'Código marcado como usado.',
+  }
+
+  return {
+    ok: true,
+    message:
+      messages[status] ??
+      'Código atualizado.',
+  }
+}
+
+/* =========================================================
+   SINCRONIZAR CÓDIGOS USADOS EM MASSA
+
+   IMPORTANTE:
+   - NÃO cria códigos
+   - NÃO altera cliente
+   - NÃO altera pedido
+   - NÃO altera data de compra
+   - somente muda status para "used"
+========================================================= */
+
+export async function syncUsedCodes(
+  formData: FormData,
+): Promise<SyncUsedCodesResult> {
+  const adminId = await requireAdmin()
+
+  if (!adminId) {
+    return {
+      ok: false,
+      error: 'Acesso não autorizado.',
+    }
+  }
+
+  const rawCodes =
+    (formData.get('codes') as string) || ''
+
+  const codes = normalizeCodes(rawCodes)
+
+  if (codes.length === 0) {
+    return {
+      ok: false,
+      error:
+        'Cole pelo menos um código para sincronizar.',
+    }
+  }
+
+  if (codes.length > 5000) {
+    return {
+      ok: false,
+      error:
+        'Máximo de 5.000 códigos por sincronização.',
+    }
+  }
+
+  const admin = createAdminClient()
+
   /*
-   * Atualiza o Admin e também a área
-   * do cliente.
+   * Busca somente códigos que já existem.
    *
-   * Assim, quando um código for marcado
-   * como usado no Admin, o cliente poderá
-   * receber o novo status no pedido.
+   * Não existe INSERT nesta função.
    */
+  const { data: existingCodes, error } =
+    await admin
+      .from('activation_codes')
+      .select('id, code, status')
+      .in('code', codes)
+
+  if (error) {
+    console.error(
+      'Erro ao localizar códigos para sincronização:',
+      error,
+    )
+
+    return {
+      ok: false,
+      error:
+        `Erro Supabase: ${error.message}`,
+    }
+  }
+
+  const existing =
+    existingCodes ?? []
+
+  const existingMap = new Map(
+    existing.map((item) => [
+      item.code,
+      item,
+    ]),
+  )
+
+  const notFound = codes.filter(
+    (code) =>
+      !existingMap.has(code),
+  )
+
+  /*
+   * Atualiza em lotes de 500.
+   *
+   * O update altera APENAS o status.
+   * user_id, order_id, assigned_at e
+   * todas as demais informações permanecem intactas.
+   */
+  const idsToUpdate = existing
+    .filter(
+      (item) =>
+        item.status !== 'used',
+    )
+    .map((item) => item.id)
+
+  let updated = 0
+
+  for (
+    let index = 0;
+    index < idsToUpdate.length;
+    index += 500
+  ) {
+    const batch = idsToUpdate.slice(
+      index,
+      index + 500,
+    )
+
+    if (batch.length === 0) {
+      continue
+    }
+
+    const { data: updatedRows, error: updateError } =
+      await admin
+        .from('activation_codes')
+        .update({
+          status: 'used',
+        })
+        .in('id', batch)
+        .select('id')
+
+    if (updateError) {
+      console.error(
+        'Erro ao marcar lote de códigos como usados:',
+        updateError,
+      )
+
+      return {
+        ok: false,
+        error:
+          `Erro ao atualizar códigos: ${updateError.message}`,
+      }
+    }
+
+    updated +=
+      updatedRows?.length ?? 0
+  }
+
+  /*
+   * "found" representa todos os códigos
+   * que realmente existem no banco.
+   *
+   * "updated" representa os que precisaram
+   * ser alterados para used.
+   */
+  const found = existing.length
 
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
 
   return {
     ok: true,
+    found,
+    updated,
+    notFound,
     message:
-      status === 'active'
-        ? 'Código ativado.'
-        : status === 'inactive'
-          ? 'Código desativado.'
-          : 'Código marcado como usado.',
+      `Sincronização concluída: ${found} encontrado(s), ${updated} atualizado(s) e ${notFound.length} não encontrado(s).`,
   }
 }
 
