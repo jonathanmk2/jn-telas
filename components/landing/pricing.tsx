@@ -14,7 +14,6 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
-import { createOrder } from '@/app/actions/orders'
 import { toast } from 'sonner'
 
 export type Product = {
@@ -316,22 +315,90 @@ export function Pricing({
       },
     )
 
+    /*
+     * ==========================================================
+     * NOVO FLUXO:
+     *
+     * Agora o pedido passa pela API /api/orders.
+     *
+     * Isso permite que o servidor responda com HTTP 429
+     * quando o limite de pedidos for atingido.
+     * ==========================================================
+     */
+
     startTransition(async () => {
       try {
-        const res = await createOrder(
-          product.id,
-          parsedQuantity,
+        const response = await fetch(
+          '/api/orders',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify({
+              productId:
+                product.id,
+              quantity:
+                parsedQuantity,
+            }),
+          },
         )
 
-        if (res.ok) {
+        const res =
+          await response.json()
+
+        /*
+         * ========================================================
+         * HTTP 429
+         * ========================================================
+         *
+         * Limite de 5 pedidos por minuto atingido.
+         */
+        if (
+          response.status === 429
+        ) {
+          const retryAfter =
+            Number(
+              res.retryAfter ??
+                60,
+            )
+
+          const seconds =
+            Number.isFinite(
+              retryAfter,
+            ) &&
+            retryAfter > 0
+              ? retryAfter
+              : 60
+
+          toast.error(
+            `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`,
+          )
+
+          return
+        }
+
+        /*
+         * ========================================================
+         * SUCESSO
+         * ========================================================
+         */
+
+        if (
+          response.ok &&
+          res.ok
+        ) {
           console.log(
             'Pagamento criado:',
             res,
           )
 
           setPayment({
-            orderId: res.orderId,
-            qrCode: res.qrCode,
+            orderId:
+              res.orderId,
+            qrCode:
+              res.qrCode,
             qrCodeBase64:
               res.qrCodeBase64,
           })
@@ -343,22 +410,41 @@ export function Pricing({
           toast.success(
             'Pagamento PIX gerado com sucesso!',
           )
-        } else if (
+
+          return
+        }
+
+        /*
+         * ========================================================
+         * AUTENTICAÇÃO
+         * ========================================================
+         */
+
+        if (
           res.needsAuth
         ) {
           router.push(
             '/auth/login?next=/minha-conta',
           )
-        } else {
-          console.error(
-            'Erro no pagamento:',
-            res.error,
-          )
 
-          toast.error(
-            res.error,
-          )
+          return
         }
+
+        /*
+         * ========================================================
+         * OUTRO ERRO
+         * ========================================================
+         */
+
+        console.error(
+          'Erro no pagamento:',
+          res.error,
+        )
+
+        toast.error(
+          res.error ??
+            'Não foi possível criar o pedido.',
+        )
       } catch (error) {
         console.error(
           'Erro inesperado:',
@@ -661,16 +747,8 @@ export function Pricing({
                       )
 
                       /*
-                       * CORREÇÃO IMPORTANTE:
-                       *
                        * Quando o valor é válido,
                        * atualizamos "quantity".
-                       *
-                       * Assim:
-                       *
-                       * 56 -> quantity = 56
-                       * 100 -> quantity = 100
-                       * 500 -> quantity = 500
                        */
                       if (
                         isValidQuantityInput(
@@ -1118,6 +1196,7 @@ export function Pricing({
                 </Button>
 
               </div>
+
             )}
 
           </div>
