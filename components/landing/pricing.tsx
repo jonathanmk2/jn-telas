@@ -48,32 +48,8 @@ function getUnitPriceCents(quantity: number): number {
   return 3500
 }
 
-function getPriceLabel(quantity: number): string {
-  if (quantity >= 10) return 'R$ 33,00 por tela'
-  if (quantity >= 5) return 'R$ 34,00 por tela'
-  return 'R$ 35,00 por tela'
-}
-
-function getNextPriceMessage(
-  quantity: number,
-): string | null {
-  if (quantity < 5) {
-    return 'A partir de 5 telas: R$ 34,00 por tela'
-  }
-
-  if (quantity < 10) {
-    return 'A partir de 10 telas: R$ 33,00 por tela'
-  }
-
-  return 'Melhor preço disponível'
-}
-
-function isValidQuantityInput(
-  value: string,
-): boolean {
-  return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(
-    value,
-  )
+function isValidQuantityInput(value: string): boolean {
+  return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(value)
 }
 
 export function Pricing({
@@ -85,8 +61,7 @@ export function Pricing({
 }) {
   const router = useRouter()
 
-  const [pending, startTransition] =
-    useTransition()
+  const [pending, startTransition] = useTransition()
 
   const [payment, setPayment] =
     useState<PaymentData | null>(null)
@@ -97,8 +72,7 @@ export function Pricing({
   const [checkingPayment, setCheckingPayment] =
     useState(false)
 
-  const [quantity, setQuantity] =
-    useState(1)
+  const [quantity, setQuantity] = useState(1)
 
   const [quantityInput, setQuantityInput] =
     useState('1')
@@ -117,21 +91,13 @@ export function Pricing({
     null
 
   const inputIsValid =
-    isValidQuantityInput(
-      quantityInput,
-    )
+    isValidQuantityInput(quantityInput)
 
   const unitPriceCents =
     getUnitPriceCents(quantity)
 
   const totalCents =
     quantity * unitPriceCents
-
-  const priceLabel =
-    getPriceLabel(quantity)
-
-  const nextPriceMessage =
-    getNextPriceMessage(quantity)
 
   function changeQuantity(value: number) {
     if (!Number.isFinite(value)) return
@@ -145,9 +111,7 @@ export function Pricing({
     )
 
     setQuantity(newQuantity)
-    setQuantityInput(
-      String(newQuantity),
-    )
+    setQuantityInput(String(newQuantity))
 
     idempotencyKeyRef.current = null
     setRateLimitMessage(null)
@@ -155,9 +119,7 @@ export function Pricing({
 
   function handleBuy() {
     if (!product) {
-      toast.error(
-        'Produto não encontrado.',
-      )
+      toast.error('Produto não encontrado.')
       return
     }
 
@@ -170,24 +132,17 @@ export function Pricing({
 
     setRateLimitMessage(null)
 
-    if (
-      !isValidQuantityInput(
-        quantityInput,
-      )
-    ) {
+    if (!isValidQuantityInput(quantityInput)) {
       toast.error(
         'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
       )
       return
     }
 
-    const parsedQuantity =
-      Number(quantityInput)
+    const parsedQuantity = Number(quantityInput)
 
     if (
-      !Number.isInteger(
-        parsedQuantity,
-      ) ||
+      !Number.isInteger(parsedQuantity) ||
       parsedQuantity < 1 ||
       parsedQuantity > 500
     ) {
@@ -198,13 +153,9 @@ export function Pricing({
     }
 
     setQuantity(parsedQuantity)
-    setQuantityInput(
-      String(parsedQuantity),
-    )
+    setQuantityInput(String(parsedQuantity))
 
-    if (
-      !idempotencyKeyRef.current
-    ) {
+    if (!idempotencyKeyRef.current) {
       idempotencyKeyRef.current =
         crypto.randomUUID()
     }
@@ -234,9 +185,7 @@ export function Pricing({
         const res =
           await response.json()
 
-        if (
-          response.status === 429
-        ) {
+        if (response.status === 429) {
           const retryAfter =
             Number(
               res.retryAfter ?? 60,
@@ -253,14 +202,11 @@ export function Pricing({
           const message =
             `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`
 
-          setRateLimitMessage(
-            message,
-          )
+          setRateLimitMessage(message)
 
           toast.error(message)
 
-          idempotencyKeyRef.current =
-            null
+          idempotencyKeyRef.current = null
 
           return
         }
@@ -270,24 +216,16 @@ export function Pricing({
           res.ok
         ) {
           setPayment({
-            orderId:
-              res.orderId,
-            qrCode:
-              res.qrCode,
+            orderId: res.orderId,
+            qrCode: res.qrCode,
             qrCodeBase64:
               res.qrCodeBase64,
           })
 
-          setOrderStatus(
-            'pending',
-          )
+          setOrderStatus('pending')
 
-          idempotencyKeyRef.current =
-            null
-
-          setRateLimitMessage(
-            null,
-          )
+          idempotencyKeyRef.current = null
+          setRateLimitMessage(null)
 
           toast.success(
             res.idempotent
@@ -305,9 +243,7 @@ export function Pricing({
           return
         }
 
-        if (
-          response.status === 409
-        ) {
+        if (response.status === 409) {
           toast.error(
             res.error ??
               'Esta operação já possui um pedido em processamento.',
@@ -391,9 +327,7 @@ export function Pricing({
           (data.status as OrderStatus) ??
           'unknown'
 
-        setOrderStatus(
-          newStatus,
-        )
+        setOrderStatus(newStatus)
 
         if (
           newStatus === 'paid' ||
@@ -457,34 +391,24 @@ export function Pricing({
     <>
       <section
         id="planos"
-        className="scroll-mt-20 bg-secondary/30 py-8 sm:py-10"
+        className="scroll-mt-20 bg-secondary/30 py-4 sm:py-6"
       >
-        <div className="mx-auto max-w-2xl px-3 sm:px-4">
-
-          <div className="mx-auto max-w-xl text-center">
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              LD CLOUD VIP
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Escolha a quantidade de telas e pague via PIX.
-            </p>
-          </div>
+        <div className="mx-auto max-w-xl px-3 sm:px-4">
 
           {product && (
-            <div className="relative mx-auto mt-5 max-w-lg rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10 sm:p-4">
+            <div className="relative mx-auto mt-2 max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10 sm:p-3">
 
-              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 30 dias de acesso
               </div>
 
               <div className="text-center">
-                <h3 className="text-xl font-bold">
+                <h3 className="text-lg font-bold">
                   LD CLOUD VIP
                 </h3>
 
-                <div className="mt-1 flex items-baseline justify-center gap-1.5">
-                  <span className="text-3xl font-bold tracking-tight sm:text-4xl">
+                <div className="mt-0.5 flex items-baseline justify-center gap-1">
+                  <span className="text-3xl font-bold tracking-tight">
                     {formatBRL(
                       unitPriceCents,
                     )}
@@ -496,7 +420,7 @@ export function Pricing({
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3">
 
                 <div className="flex items-center gap-2">
 
@@ -528,9 +452,7 @@ export function Pricing({
                       const value =
                         event.target.value
 
-                      setQuantityInput(
-                        value,
-                      )
+                      setQuantityInput(value)
 
                       if (
                         isValidQuantityInput(
@@ -555,9 +477,7 @@ export function Pricing({
                         : ''
                     }`}
                     aria-label="Quantidade de telas"
-                    aria-invalid={
-                      !inputIsValid
-                    }
+                    aria-invalid={!inputIsValid}
                     autoComplete="off"
                   />
 
@@ -582,19 +502,9 @@ export function Pricing({
 
                 </div>
 
-                <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>
-                    Quantidade
-                  </span>
-
-                  <span>
-                    1 a 500 telas
-                  </span>
-                </div>
-
               </div>
 
-              <div className="mt-3 grid grid-cols-3 divide-x rounded-lg border bg-secondary/40 px-2 py-2 text-center text-xs">
+              <div className="mt-2 grid grid-cols-3 divide-x rounded-lg border bg-secondary/40 px-1 py-1.5 text-center text-[10px]">
 
                 <div
                   className={
@@ -603,9 +513,7 @@ export function Pricing({
                       : 'text-muted-foreground'
                   }
                 >
-                  1–4
-                  <br />
-                  R$ 35
+                  1–4 · R$ 35
                 </div>
 
                 <div
@@ -616,9 +524,7 @@ export function Pricing({
                       : 'text-muted-foreground'
                   }
                 >
-                  5–9
-                  <br />
-                  R$ 34
+                  5–9 · R$ 34
                 </div>
 
                 <div
@@ -628,31 +534,21 @@ export function Pricing({
                       : 'text-muted-foreground'
                   }
                 >
-                  10+
-                  <br />
-                  R$ 33
+                  10+ · R$ 33
                 </div>
 
               </div>
 
-              {nextPriceMessage && (
-                <p className="mt-1 text-center text-[11px] text-muted-foreground">
-                  {nextPriceMessage}
-                </p>
-              )}
+              <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
 
-              <div className="mt-3 flex items-center justify-between rounded-lg border bg-background px-3 py-2.5">
-
-                <span className="text-sm text-muted-foreground">
-                  Total (
-                  {quantity} tela
+                <span className="text-sm font-semibold">
+                  Total · {quantity} tela
                   {quantity === 1
                     ? ''
                     : 's'}
-                  )
                 </span>
 
-                <span className="text-xl font-bold">
+                <span className="text-lg font-bold">
                   {formatBRL(
                     totalCents,
                   )}
@@ -660,32 +556,32 @@ export function Pricing({
 
               </div>
 
-              <ul className="mt-3 grid grid-cols-1 gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+              <ul className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
 
                 <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
                   Acesso VIP por 30 dias
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
                   Telas simultâneas
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
                   Suporte via WhatsApp
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
                   Pagamento PIX
                 </li>
 
               </ul>
 
               <Button
-                className="mt-3 h-10 w-full text-sm"
+                className="mt-2 h-9 w-full text-sm"
                 onClick={handleBuy}
                 disabled={
                   pending ||
@@ -825,4 +721,69 @@ export function Pricing({
 
               <div className="text-center">
 
-                <h2 className="text-2xl fon
+                <h2 className="text-2xl font-bold">
+                  Pague com PIX
+                </h2>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Escaneie o QR Code ou copie o código PIX.
+                </p>
+
+                {qrImage ? (
+
+                  <div className="mt-6 flex justify-center">
+
+                    <div className="rounded-xl bg-white p-3">
+
+                      <img
+                        src={qrImage}
+                        alt="QR Code PIX"
+                        className="h-56 w-56"
+                      />
+
+                    </div>
+
+                  </div>
+
+                ) : (
+
+                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                    O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
+                  </div>
+
+                )}
+
+                {payment.qrCode && (
+                  <>
+
+                    <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+                      {payment.qrCode}
+                    </div>
+
+                    <Button
+                      className="mt-4 w-full"
+                      onClick={
+                        copyPixCode
+                      }
+                    >
+                      <Copy className="size-4" />
+                      Copiar código PIX
+                    </Button>
+
+                  </>
+                )}
+
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+
+                  <Loader2 className="size-4 animate-spin text-primary" />
+
+                  <span>
+                    {checkingPayment
+                      ? 'Verificando pagamento...'
+                      : 'Aguardando confirmação do pagamento...'}
+                  </span>
+
+                </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Esta página verifica automaticame
