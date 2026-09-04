@@ -54,35 +54,7 @@ function getUnitPriceCents(quantity: number): number {
   return 3500
 }
 
-function getPriceLabel(quantity: number): string {
-  if (quantity >= 10) {
-    return 'R$ 33,00 por tela'
-  }
-
-  if (quantity >= 5) {
-    return 'R$ 34,00 por tela'
-  }
-
-  return 'R$ 35,00 por tela'
-}
-
-function getNextPriceMessage(
-  quantity: number,
-): string | null {
-  if (quantity < 5) {
-    return 'A partir de 5 telas: R$ 34,00 por tela'
-  }
-
-  if (quantity < 10) {
-    return 'A partir de 10 telas: R$ 33,00 por tela'
-  }
-
-  return 'Melhor preço disponível'
-}
-
-function isValidQuantityInput(
-  value: string,
-): boolean {
+function isValidQuantityInput(value: string): boolean {
   return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(
     value,
   )
@@ -139,13 +111,9 @@ export function Pricing({
   const totalCents =
     quantity * unitPriceCents
 
-  const priceLabel =
-    getPriceLabel(quantity)
-
-  const nextPriceMessage =
-    getNextPriceMessage(quantity)
-
-  function changeQuantity(value: number) {
+  function changeQuantity(
+    value: number,
+  ) {
     if (!Number.isFinite(value)) {
       return
     }
@@ -163,7 +131,9 @@ export function Pricing({
       String(newQuantity),
     )
 
-    idempotencyKeyRef.current = null
+    idempotencyKeyRef.current =
+      null
+
     setRateLimitMessage(null)
   }
 
@@ -345,11 +315,6 @@ export function Pricing({
           return
         }
 
-        console.error(
-          'Erro no pagamento:',
-          res.error,
-        )
-
         toast.error(
           res.error ??
             'Não foi possível criar o pedido.',
@@ -421,10 +386,6 @@ export function Pricing({
         )
 
         if (!response.ok) {
-          console.error(
-            'Erro ao consultar status do pagamento.',
-          )
-
           return
         }
 
@@ -434,11 +395,6 @@ export function Pricing({
         if (!active) {
           return
         }
-
-        console.log(
-          'Status do pedido:',
-          data.status,
-        )
 
         const newStatus =
           (data.status as OrderStatus) ??
@@ -522,19 +478,23 @@ export function Pricing({
           {product && (
             <div className="relative mx-auto max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10">
 
-              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              {/* BADGE */}
+
+              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 30 dias de acesso
               </div>
 
-              <div className="text-center">
+              {/* TÍTULO + PREÇO */}
+
+              <div className="pt-1 text-center">
 
                 <h3 className="text-xl font-bold">
                   LD CLOUD VIP
                 </h3>
 
-                <div className="mt-1 flex items-baseline justify-center gap-1.5">
+                <div className="mt-0.5 flex items-baseline justify-center gap-1">
 
-                  <span className="text-3xl font-bold tracking-tight">
+                  <span className="text-3xl font-bold">
                     {formatBRL(
                       unitPriceCents,
                     )}
@@ -546,17 +506,11 @@ export function Pricing({
 
                 </div>
 
-                <p className="mt-0.5 text-xs font-medium text-primary">
-                  {priceLabel}
-                </p>
-
               </div>
 
-              <div className="mt-3">
+              {/* QUANTIDADE */}
 
-                <p className="mb-1.5 text-center text-xs font-semibold">
-                  Quantidade de telas
-                </p>
+              <div className="mt-3">
 
                 <div className="flex items-center gap-2">
 
@@ -574,7 +528,6 @@ export function Pricing({
                       pending ||
                       quantity <= 1
                     }
-                    aria-label="Diminuir quantidade"
                   >
                     <Minus className="size-4" />
                   </Button>
@@ -609,15 +562,12 @@ export function Pricing({
                         )
                       }
                     }}
-                    className={`h-8 w-full rounded-lg border bg-background px-3 text-center text-base font-bold outline-none ${
+                    className={`h-8 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${
                       !inputIsValid
-                        ? 'border-red-500 focus:border-red-500'
+                        ? 'border-red-500'
                         : ''
                     }`}
                     aria-label="Quantidade de telas"
-                    aria-invalid={
-                      !inputIsValid
-                    }
                     autoComplete="off"
                   />
 
@@ -635,36 +585,31 @@ export function Pricing({
                       pending ||
                       quantity >= 500
                     }
-                    aria-label="Aumentar quantidade"
                   >
                     <Plus className="size-4" />
                   </Button>
 
                 </div>
 
-                {!inputIsValid && (
-                  <p className="mt-1 text-center text-[10px] font-medium text-red-500">
-                    Digite uma quantidade entre 1 e 500.
-                  </p>
-                )}
-
               </div>
 
-              <div className="mt-2 grid grid-cols-3 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]">
+              {/* PREÇOS */}
+
+              <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]">
 
                 <div
                   className={
                     quantity < 5
-                      ? 'font-semibold text-primary'
+                      ? 'font-bold text-primary'
                       : 'text-muted-foreground'
                   }
                 >
                   <div>
-                    1–4 telas
+                    1–4
                   </div>
 
                   <div>
-                    R$ 35,00
+                    R$ 35
                   </div>
                 </div>
 
@@ -672,105 +617,86 @@ export function Pricing({
                   className={
                     quantity >= 5 &&
                     quantity < 10
-                      ? 'font-semibold text-primary'
+                      ? 'font-bold text-primary'
                       : 'text-muted-foreground'
                   }
                 >
                   <div>
-                    5–9 telas
+                    5–9
                   </div>
 
                   <div>
-                    R$ 34,00
+                    R$ 34
                   </div>
                 </div>
 
                 <div
                   className={
                     quantity >= 10
-                      ? 'font-semibold text-primary'
+                      ? 'font-bold text-primary'
                       : 'text-muted-foreground'
                   }
                 >
                   <div>
-                    10+ telas
+                    10+
                   </div>
 
                   <div>
-                    R$ 33,00
+                    R$ 33
                   </div>
                 </div>
 
               </div>
 
+              {/* TOTAL */}
+
               <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
 
                 <span className="text-xs text-muted-foreground">
-                  {quantity} ×{' '}
+                  {quantity} tela
+                  {quantity === 1
+                    ? ''
+                    : 's'} ×{' '}
                   {formatBRL(
                     unitPriceCents,
                   )}
                 </span>
 
-                <div className="flex items-center gap-2">
+                <span className="text-lg font-bold">
+                  {formatBRL(
+                    totalCents,
+                  )}
+                </span>
 
-                  <span className="text-xs font-semibold">
-                    Total
-                  </span>
+              </div>
 
-                  <span className="text-lg font-bold">
-                    {formatBRL(
-                      totalCents,
-                    )}
-                  </span>
+              {/* BENEFÍCIOS */}
 
+              <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1">
+
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  30 dias VIP
+                </div>
+
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  Telas simultâneas
+                </div>
+
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  Suporte WhatsApp
+                </div>
+
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  Pagamento PIX
                 </div>
 
               </div>
 
-              <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-
-                <li className="flex items-center gap-1.5">
-
-                  <Check className="size-3 shrink-0 text-primary" />
-
-                  <span>
-                    30 dias de acesso VIP
-                  </span>
-
-                </li>
-
-                <li className="flex items-center gap-1.5">
-
-                  <Check className="size-3 shrink-0 text-primary" />
-
-                  <span>
-                    Telas simultâneas
-                  </span>
-
-                </li>
-
-                <li className="flex items-center gap-1.5">
-
-                  <Check className="size-3 shrink-0 text-primary" />
-
-                  <span>
-                    Suporte via WhatsApp
-                  </span>
-
-                </li>
-
-                <li className="flex items-center gap-1.5">
-
-                  <Check className="size-3 shrink-0 text-primary" />
-
-                  <span>
-                    Pagamento PIX
-                  </span>
-
-                </li>
-
-              </ul>
+              {/* BOTÃO */}
 
               <Button
                 className="mt-2 h-9 w-full text-sm"
@@ -792,10 +718,9 @@ export function Pricing({
                     {inputIsValid
                       ? quantity
                       : '—'}{' '}
-                    {inputIsValid
-                      ? quantity === 1
-                        ? 'tela'
-                        : 'telas'
+                    {inputIsValid &&
+                    quantity === 1
+                      ? 'tela'
                       : 'telas'}
                   </>
                 )}
@@ -806,7 +731,6 @@ export function Pricing({
                   role="alert"
                   className="mt-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-center"
                 >
-
                   <p className="text-xs font-semibold text-red-500">
                     🚫 Limite de pedidos atingido
                   </p>
@@ -814,7 +738,6 @@ export function Pricing({
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
                     {rateLimitMessage}
                   </p>
-
                 </div>
               )}
 
@@ -823,6 +746,8 @@ export function Pricing({
 
         </div>
       </section>
+
+      {/* MODAL PIX */}
 
       {payment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -848,11 +773,7 @@ export function Pricing({
 
               <div className="py-6 text-center">
 
-                <div className="flex justify-center">
-
-                  <CheckCircle2 className="size-20 text-green-500" />
-
-                </div>
+                <CheckCircle2 className="mx-auto size-20 text-green-500" />
 
                 <h2 className="mt-5 text-2xl font-bold">
                   Pagamento confirmado!
@@ -860,10 +781,6 @@ export function Pricing({
 
                 <p className="mt-3 text-sm text-muted-foreground">
                   Seu pagamento foi aprovado com sucesso.
-                </p>
-
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Seus códigos já foram adicionados à sua conta.
                 </p>
 
                 <Button
@@ -884,4 +801,74 @@ export function Pricing({
                   className="mt-3 w-full"
                   onClick={() => {
                     setPayment(null)
-              
+                  }}
+                >
+                  Fechar
+                </Button>
+
+              </div>
+
+            ) : orderStatus === 'cancelled' ? (
+
+              <div className="py-6 text-center">
+
+                <h2 className="text-2xl font-bold">
+                  Pagamento cancelado
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Este pagamento não foi aprovado.
+                </p>
+
+                <Button
+                  variant="outline"
+                  className="mt-8 w-full"
+                  onClick={() => {
+                    setPayment(null)
+                  }}
+                >
+                  Fechar
+                </Button>
+
+              </div>
+
+            ) : (
+
+              <div className="text-center">
+
+                <h2 className="text-2xl font-bold">
+                  Pague com PIX
+                </h2>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Escaneie o QR Code ou copie o código PIX.
+                </p>
+
+                {qrImage ? (
+
+                  <div className="mt-6 flex justify-center">
+
+                    <div className="rounded-xl bg-white p-3">
+
+                      <img
+                        src={qrImage}
+                        alt="QR Code PIX"
+                        className="h-56 w-56"
+                      />
+
+                    </div>
+
+                  </div>
+
+                ) : (
+
+                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                    O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
+                  </div>
+
+                )}
+
+                {payment.qrCode && (
+                  <>
+
+                    <div className="mt-6 max-h-
