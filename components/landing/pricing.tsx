@@ -1,6 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Check,
@@ -16,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
 
-type Product = {
+export type Product = {
   id: string
   name: string
   screens: number
@@ -26,624 +31,1068 @@ type Product = {
 
 type PaymentData = {
   orderId: string
-  qrCode: string
-  qrCodeBase64: string
+  qrCode: string | null
+  qrCodeBase64: string | null
 }
 
-type OrderStatus = 'pending' | 'paid' | 'delivered' | 'cancelled' | 'unknown'
+type OrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'delivered'
+  | 'cancelled'
+  | 'unknown'
 
-const PRICING_TIERS = [
-  { min: 1, max: 4, unitPrice: 3500 },
-  { min: 5, max: 9, unitPrice: 3400 },
-  { min: 10, max: 500, unitPrice: 3300 },
-]
+function getUnitPriceCents(quantity: number): number {
+  if (quantity >= 10) {
+    return 3300
+  }
 
-function getUnitPrice(quantity: number) {
-  const tier = PRICING_TIERS.find(
-    (item) => quantity >= item.min && quantity <= item.max,
-  )
+  if (quantity >= 5) {
+    return 3400
+  }
 
-  return tier?.unitPrice ?? 3500
+  return 3500
 }
 
-function getNextPriceMessage(quantity: number) {
+function getPriceLabel(quantity: number): string {
+  if (quantity >= 10) {
+    return 'R$ 33,00 por tela'
+  }
+
+  if (quantity >= 5) {
+    return 'R$ 34,00 por tela'
+  }
+
+  return 'R$ 35,00 por tela'
+}
+
+function getNextPriceMessage(
+  quantity: number,
+): string | null {
   if (quantity < 5) {
-    return `Compre ${5 - quantity} tela${
-      5 - quantity === 1 ? '' : 's'
-    } a mais e pague R$ 34,00 cada.`
+    return 'A partir de 5 telas: R$ 34,00 por tela'
   }
 
   if (quantity < 10) {
-    return `Compre ${10 - quantity} tela${
-      10 - quantity === 1 ? '' : 's'
-    } a mais e pague R$ 33,00 cada.`
+    return 'A partir de 10 telas: R$ 33,00 por tela'
   }
 
-  return null
+  return 'Melhor preço disponível'
 }
 
-function isValidQuantity(value: string) {
-  return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(value)
+function isValidQuantityInput(
+  value: string,
+): boolean {
+  return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(
+    value,
+  )
 }
 
-export default function Pricing({ products }: { products: Product[] }) {
+export function Pricing({
+  products,
+  isLoggedIn,
+}: {
+  products: Product[]
+  isLoggedIn: boolean
+}) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
 
-  const [quantity, setQuantity] = useState(1)
-  const [quantityInput, setQuantityInput] = useState('1')
+  const [pending, startTransition] =
+    useTransition()
 
-  const [payment, setPayment] = useState<PaymentData | null>(null)
-  const [paymentStatus, setPaymentStatus] =
+  const [payment, setPayment] =
+    useState<PaymentData | null>(null)
+
+  const [orderStatus, setOrderStatus] =
     useState<OrderStatus>('pending')
 
-  const [copied, setCopied] = useState(false)
+  const [checkingPayment, setCheckingPayment] =
+    useState(false)
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const [quantity, setQuantity] =
+    useState(1)
+
+  const [quantityInput, setQuantityInput] =
+    useState('1')
+
+  const [rateLimitMessage, setRateLimitMessage] =
+    useState<string | null>(null)
+
+  const idempotencyKeyRef =
+    useRef<string | null>(null)
 
   const product =
-    products.find((item) => item.screens === 1) ?? products[0]
+    products.find(
+      (item) => item.screens === 1,
+    ) ??
+    products[0] ??
+    null
 
-  const unitPrice = getUnitPrice(quantity)
-  const totalPrice = unitPrice * quantity
-  const nextPriceMessage = getNextPriceMessage(quantity)
+  const inputIsValid =
+    isValidQuantityInput(
+      quantityInput,
+    )
 
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current)
-      }
-    }
-  }, [])
+  const unitPriceCents =
+    getUnitPriceCents(quantity)
 
-  useEffect(() => {
-    if (!payment?.orderId) return
+  const totalCents =
+    quantity * unitPriceCents
 
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(
-          `/api/orders/${payment.orderId}`,
-          {
-            cache: 'no-store',
-          },
-        )
+  const priceLabel =
+    getPriceLabel(quantity)
 
-        if (!response.ok) return
+  const nextPriceMessage =
+    getNextPriceMessage(quantity)
 
-        const data = await response.json()
-
-        const status: OrderStatus =
-          data?.order?.status ?? data?.status ?? 'unknown'
-
-        setPaymentStatus(status)
-
-        if (status === 'paid' || status === 'delivered') {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-        }
-
-        if (status === 'cancelled') {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-        }
-      } catch {
-        // Mantém o polling em caso de erro temporário.
-      }
+  function changeQuantity(value: number) {
+    if (!Number.isFinite(value)) {
+      return
     }
 
-    checkStatus()
+    const newQuantity = Math.max(
+      1,
+      Math.min(
+        500,
+        Math.floor(value),
+      ),
+    )
 
-    pollingRef.current = setInterval(checkStatus, 3000)
+    setQuantity(
+      newQuantity,
+    )
 
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current)
-        pollingRef.current = null
-      }
-    }
-  }, [payment?.orderId])
+    setQuantityInput(
+      String(newQuantity),
+    )
 
-  const updateQuantity = (nextQuantity: number) => {
-    const safeQuantity = Math.min(500, Math.max(1, nextQuantity))
+    idempotencyKeyRef.current = null
 
-    setQuantity(safeQuantity)
-    setQuantityInput(String(safeQuantity))
+    setRateLimitMessage(null)
   }
 
-  const handleQuantityInput = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const value = event.target.value
-
-    if (value === '') {
-      setQuantityInput('')
-      return
-    }
-
-    if (!/^\d+$/.test(value)) {
-      return
-    }
-
-    if (value.length > 3) {
-      return
-    }
-
-    const numericValue = Number(value)
-
-    if (numericValue > 500) {
-      return
-    }
-
-    setQuantityInput(value)
-
-    if (numericValue >= 1) {
-      setQuantity(numericValue)
-    }
-  }
-
-  const handleQuantityBlur = () => {
-    if (!isValidQuantity(quantityInput)) {
-      setQuantityInput(String(quantity))
-      return
-    }
-
-    const numericValue = Number(quantityInput)
-
-    if (numericValue < 1 || numericValue > 500) {
-      setQuantityInput(String(quantity))
-      return
-    }
-
-    setQuantity(numericValue)
-    setQuantityInput(String(numericValue))
-  }
-
-  const handleBuy = () => {
+  function handleBuy() {
     if (!product) {
-      toast.error('Produto indisponível no momento.')
+      toast.error(
+        'Produto não encontrado.',
+      )
+
       return
     }
 
-    if (!isValidQuantity(quantityInput)) {
-      toast.error('Informe uma quantidade válida entre 1 e 500.')
+    if (!isLoggedIn) {
+      router.push(
+        '/auth/sign-up?next=/minha-conta',
+      )
+
       return
     }
 
-    const numericQuantity = Number(quantityInput)
+    setRateLimitMessage(null)
 
     if (
-      !Number.isInteger(numericQuantity) ||
-      numericQuantity < 1 ||
-      numericQuantity > 500
+      !isValidQuantityInput(
+        quantityInput,
+      )
     ) {
-      toast.error('Informe uma quantidade válida entre 1 e 500.')
+      toast.error(
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
+      )
+
       return
     }
 
-    setQuantity(numericQuantity)
+    const parsedQuantity =
+      Number(quantityInput)
+
+    if (
+      !Number.isInteger(
+        parsedQuantity,
+      ) ||
+      parsedQuantity < 1 ||
+      parsedQuantity > 500
+    ) {
+      toast.error(
+        'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
+      )
+
+      return
+    }
+
+    setQuantity(
+      parsedQuantity,
+    )
+
+    setQuantityInput(
+      String(parsedQuantity),
+    )
+
+    if (
+      !idempotencyKeyRef.current
+    ) {
+      idempotencyKeyRef.current =
+        crypto.randomUUID()
+    }
+
+    const idempotencyKey =
+      idempotencyKeyRef.current
+
+    console.log(
+      'Iniciando compra:',
+      {
+        productId: product.id,
+        quantity: parsedQuantity,
+        idempotencyKey,
+        totalCents:
+          getUnitPriceCents(
+            parsedQuantity,
+          ) *
+          parsedQuantity,
+      },
+    )
 
     startTransition(async () => {
       try {
-        const idempotencyKey = crypto.randomUUID()
-
-        const response = await fetch('/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
+        const response = await fetch(
+          '/api/orders',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              'Idempotency-Key':
+                idempotencyKey,
+            },
+            body: JSON.stringify({
+              productId:
+                product.id,
+              quantity:
+                parsedQuantity,
+            }),
           },
-          body: JSON.stringify({
-            productId: product.id,
-            quantity: numericQuantity,
-          }),
-        })
+        )
 
-        const data = await response.json().catch(() => null)
+        const res =
+          await response.json()
 
-        if (response.status === 401) {
-          toast.error('Faça login para continuar.')
-
-          router.push(
-            `/login?redirect=${encodeURIComponent('/')}`,
-          )
-
-          return
-        }
-
-        if (response.status === 429) {
-          toast.error(
-            data?.error ??
-              'Muitas tentativas. Aguarde um momento e tente novamente.',
-          )
-
-          return
-        }
-
-        if (response.status === 409) {
-          if (data?.order?.id && data?.payment?.qrCode) {
-            setPayment({
-              orderId: data.order.id,
-              qrCode: data.payment.qrCode,
-              qrCodeBase64: data.payment.qrCodeBase64 ?? '',
-            })
-
-            setPaymentStatus(
-              data.order.status === 'paid'
-                ? 'paid'
-                : data.order.status === 'delivered'
-                  ? 'delivered'
-                  : 'pending',
+        if (
+          response.status === 429
+        ) {
+          const retryAfter =
+            Number(
+              res.retryAfter ??
+                60,
             )
 
-            return
-          }
+          const seconds =
+            Number.isFinite(
+              retryAfter,
+            ) &&
+            retryAfter > 0
+              ? retryAfter
+              : 60
+
+          const message =
+            `Limite de pedidos atingido. Aguarde ${seconds} segundos e tente novamente.`
+
+          setRateLimitMessage(
+            message,
+          )
 
           toast.error(
-            data?.error ?? 'Este pedido já foi processado.',
+            message,
+          )
+
+          idempotencyKeyRef.current =
+            null
+
+          return
+        }
+
+        if (
+          response.ok &&
+          res.ok
+        ) {
+          console.log(
+            'Pagamento criado:',
+            res,
+          )
+
+          setPayment({
+            orderId:
+              res.orderId,
+            qrCode:
+              res.qrCode,
+            qrCodeBase64:
+              res.qrCodeBase64,
+          })
+
+          setOrderStatus(
+            'pending',
+          )
+
+          idempotencyKeyRef.current =
+            null
+
+          setRateLimitMessage(
+            null,
+          )
+
+          toast.success(
+            res.idempotent
+              ? 'Pedido recuperado com sucesso!'
+              : 'Pagamento PIX gerado com sucesso!',
           )
 
           return
         }
 
-        if (!response.ok) {
-          throw new Error(
-            data?.error ?? 'Não foi possível criar o pedido.',
+        if (
+          res.needsAuth
+        ) {
+          router.push(
+            '/auth/login?next=/minha-conta',
           )
+
+          return
         }
 
-        const order = data?.order
-        const paymentData = data?.payment
-
-        if (!order?.id || !paymentData?.qrCode) {
-          throw new Error(
-            'Não foi possível gerar o pagamento PIX.',
+        if (
+          response.status === 409
+        ) {
+          toast.error(
+            res.error ??
+              'Esta operação já possui um pedido em processamento.',
           )
+
+          return
         }
 
-        setPayment({
-          orderId: order.id,
-          qrCode: paymentData.qrCode,
-          qrCodeBase64: paymentData.qrCodeBase64 ?? '',
-        })
-
-        setPaymentStatus('pending')
-      } catch (error) {
-        console.error(error)
+        console.error(
+          'Erro no pagamento:',
+          res.error,
+        )
 
         toast.error(
-          error instanceof Error
-            ? error.message
-            : 'Ocorreu um erro ao criar o pedido.',
+          res.error ??
+            'Não foi possível criar o pedido.',
+        )
+      } catch (error) {
+        console.error(
+          'Erro inesperado:',
+          error,
+        )
+
+        toast.error(
+          'Ocorreu um erro inesperado ao gerar o pagamento. Tente novamente.',
         )
       }
     })
   }
 
-  const copyPixCode = async () => {
-    if (!payment?.qrCode) return
+  async function copyPixCode() {
+    if (!payment?.qrCode) {
+      toast.error(
+        'Código PIX não disponível.',
+      )
+
+      return
+    }
 
     try {
-      await navigator.clipboard.writeText(payment.qrCode)
-      setCopied(true)
+      await navigator.clipboard.writeText(
+        payment.qrCode,
+      )
 
-      toast.success('Código PIX copiado!')
-
-      setTimeout(() => {
-        setCopied(false)
-      }, 2000)
+      toast.success(
+        'Código PIX copiado!',
+      )
     } catch {
-      toast.error('Não foi possível copiar o código PIX.')
+      toast.error(
+        'Não foi possível copiar o código PIX.',
+      )
     }
   }
 
-  const closePayment = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current)
-      pollingRef.current = null
+  useEffect(() => {
+    if (!payment?.orderId) {
+      return
     }
 
-    setPayment(null)
-    setPaymentStatus('pending')
-    setCopied(false)
-  }
+    if (
+      orderStatus === 'paid' ||
+      orderStatus === 'delivered' ||
+      orderStatus === 'cancelled'
+    ) {
+      return
+    }
 
-  if (!product) {
-    return null
-  }
+    let active = true
+
+    async function checkPayment() {
+      try {
+        setCheckingPayment(
+          true,
+        )
+
+        const response = await fetch(
+          `/api/payment-status?orderId=${payment.orderId}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        )
+
+        if (!response.ok) {
+          console.error(
+            'Erro ao consultar status do pagamento.',
+          )
+
+          return
+        }
+
+        const data =
+          await response.json()
+
+        if (!active) {
+          return
+        }
+
+        console.log(
+          'Status do pedido:',
+          data.status,
+        )
+
+        const newStatus =
+          (data.status as OrderStatus) ??
+          'unknown'
+
+        setOrderStatus(
+          newStatus,
+        )
+
+        if (
+          newStatus === 'paid' ||
+          newStatus === 'delivered'
+        ) {
+          toast.success(
+            'Pagamento confirmado com sucesso!',
+          )
+        }
+
+        if (
+          newStatus === 'cancelled'
+        ) {
+          toast.error(
+            'Este pagamento foi cancelado.',
+          )
+        }
+      } catch (error) {
+        console.error(
+          'Erro ao verificar pagamento:',
+          error,
+        )
+      } finally {
+        if (active) {
+          setCheckingPayment(
+            false,
+          )
+        }
+      }
+    }
+
+    checkPayment()
+
+    const interval =
+      setInterval(
+        checkPayment,
+        3000,
+      )
+
+    return () => {
+      active = false
+
+      clearInterval(
+        interval,
+      )
+    }
+  }, [
+    payment?.orderId,
+    orderStatus,
+  ])
+
+  const qrImage =
+    payment?.qrCodeBase64
+      ? payment.qrCodeBase64.startsWith(
+          'data:image',
+        )
+        ? payment.qrCodeBase64
+        : `data:image/png;base64,${payment.qrCodeBase64}`
+      : null
+
+  const paymentConfirmed =
+    orderStatus === 'paid' ||
+    orderStatus === 'delivered'
 
   return (
     <>
       <section
-        id="precos"
-        className="py-12 sm:py-14"
+        id="planos"
+        className="scroll-mt-20 bg-secondary/30 py-12 sm:py-14"
       >
-        <div className="mx-auto max-w-6xl px-4">
+        <div className="mx-auto max-w-3xl px-4">
+
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Escolha seu plano
+
+            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
+              LD CLOUD VIP
             </h2>
 
-            <p className="mt-3 text-muted-foreground">
-              Ative suas telas LD CLOUD de forma rápida e segura.
+            <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
+              Escolha quantas telas você precisa e pague tudo em um único PIX.
             </p>
+
           </div>
 
-          <div className="mx-auto mt-8 max-w-xl rounded-2xl border bg-card p-4 shadow-lg sm:p-5">
-            <div className="text-center">
-              <h3 className="text-xl font-semibold">
-                Tela LD CLOUD
-              </h3>
+          {product && (
+            <div className="relative mx-auto mt-8 max-w-xl rounded-2xl border border-primary bg-card p-4 shadow-lg shadow-primary/10 sm:p-5">
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ativação por código
-              </p>
-            </div>
-
-            <div className="mt-5 text-center">
-              <div className="flex items-end justify-center gap-1">
-                <span className="text-4xl font-bold tracking-tight sm:text-5xl">
-                  {formatBRL(totalPrice)}
-                </span>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
+                30 dias de acesso
               </div>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatBRL(unitPrice)} por tela
-              </p>
-            </div>
+              <div className="text-center">
 
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-10 rounded-full"
-                disabled={quantity <= 1}
-                onClick={() => updateQuantity(quantity - 1)}
-              >
-                <Minus className="size-4" />
-                <span className="sr-only">
-                  Diminuir quantidade
-                </span>
-              </Button>
+                <h3 className="text-2xl font-bold">
+                  LD CLOUD VIP
+                </h3>
 
-              <input
-                type="text"
-                inputMode="numeric"
-                value={quantityInput}
-                onChange={handleQuantityInput}
-                onBlur={handleQuantityBlur}
-                className="h-10 w-24 rounded-lg border bg-background text-center text-lg font-semibold outline-none transition focus:ring-2 focus:ring-ring"
-                aria-label="Quantidade de telas"
-              />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Acesso VIP por 30 dias
+                </p>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-10 rounded-full"
-                disabled={quantity >= 500}
-                onClick={() => updateQuantity(quantity + 1)}
-              >
-                <Plus className="size-4" />
-                <span className="sr-only">
-                  Aumentar quantidade
-                </span>
-              </Button>
-            </div>
-
-            <div className="mt-4 space-y-2 rounded-xl border bg-muted/30 p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  1–4 telas
-                </span>
-
-                <span className="font-medium">
-                  R$ 35,00 / tela
-                </span>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  5–9 telas
-                </span>
+              <div className="mt-5 text-center">
 
-                <span className="font-medium">
-                  R$ 34,00 / tela
-                </span>
-              </div>
+                <div className="flex items-end justify-center gap-2">
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  10+ telas
-                </span>
+                  <span className="text-4xl font-bold tracking-tight sm:text-5xl">
+                    {formatBRL(
+                      unitPriceCents,
+                    )}
+                  </span>
 
-                <span className="font-medium">
-                  R$ 33,00 / tela
-                </span>
-              </div>
-            </div>
+                  <span className="mb-2 text-sm text-muted-foreground">
+                    / tela
+                  </span>
 
-            {nextPriceMessage && (
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                {nextPriceMessage}
-              </p>
-            )}
-
-            <div className="mt-4 rounded-xl border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">
-                  Total
-                </span>
-
-                <span className="text-2xl font-bold">
-                  {formatBRL(totalPrice)}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-2.5">
-              {[
-                'Ativação rápida por código',
-                'Código enviado após confirmação do pagamento',
-                'Suporte para ativação e renovação',
-                'Pagamento seguro via PIX',
-              ].map((benefit) => (
-                <div
-                  key={benefit}
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Check className="size-4 shrink-0 text-primary" />
-                  <span>{benefit}</span>
                 </div>
-              ))}
-            </div>
 
-            <Button
-              type="button"
-              className="mt-5 h-11 w-full"
-              disabled={isPending}
-              onClick={handleBuy}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Processando...
-                </>
-              ) : (
-                'Comprar agora'
+                <p className="mt-2 text-sm font-medium text-primary">
+                  {priceLabel}
+                </p>
+
+              </div>
+
+              <div className="mt-5">
+
+                <p className="mb-3 text-center text-sm font-semibold">
+                  Quantidade de telas
+                </p>
+
+                <div className="mx-auto flex max-w-sm items-center gap-3">
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-10 shrink-0"
+                    onClick={() =>
+                      changeQuantity(
+                        quantity - 1,
+                      )
+                    }
+                    disabled={
+                      pending ||
+                      quantity <= 1
+                    }
+                    aria-label="Diminuir quantidade"
+                  >
+                    <Minus className="size-5" />
+                  </Button>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={quantityInput}
+                    disabled={pending}
+                    onChange={(event) => {
+                      const value =
+                        event.target.value
+
+                      setQuantityInput(
+                        value,
+                      )
+
+                      if (
+                        isValidQuantityInput(
+                          value,
+                        )
+                      ) {
+                        setQuantity(
+                          Number(value),
+                        )
+
+                        idempotencyKeyRef.current =
+                          null
+
+                        setRateLimitMessage(
+                          null,
+                        )
+                      }
+                    }}
+                    className={`h-10 w-full rounded-lg border bg-background px-3 text-center text-lg font-bold outline-none ${
+                      !inputIsValid
+                        ? 'border-red-500 focus:border-red-500'
+                        : ''
+                    }`}
+                    aria-label="Quantidade de telas"
+                    aria-invalid={
+                      !inputIsValid
+                    }
+                    autoComplete="off"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-10 shrink-0"
+                    onClick={() =>
+                      changeQuantity(
+                        quantity + 1,
+                      )
+                    }
+                    disabled={
+                      pending ||
+                      quantity >= 500
+                    }
+                    aria-label="Aumentar quantidade"
+                  >
+                    <Plus className="size-5" />
+                  </Button>
+
+                </div>
+
+                {!inputIsValid ? (
+                  <p className="mt-2 text-center text-xs font-medium text-red-500">
+                    Quantidade inválida. Digite um número inteiro entre 1 e 500.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Informe uma quantidade inteira de 1 a 500.
+                  </p>
+                )}
+
+              </div>
+
+              <div className="mt-4 rounded-xl border bg-secondary/40 p-3">
+
+                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+
+                  <div
+                    className={
+                      quantity < 5
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    1–4 telas
+
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 35,00 / tela
+                    </span>
+                  </div>
+
+                  <div
+                    className={
+                      quantity >= 5 &&
+                      quantity < 10
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    5–9 telas
+
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 34,00 / tela
+                    </span>
+                  </div>
+
+                  <div
+                    className={
+                      quantity >= 10
+                        ? 'font-semibold text-primary'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    10+ telas
+
+                    <br />
+
+                    <span className="text-xs">
+                      R$ 33,00 / tela
+                    </span>
+                  </div>
+
+                </div>
+
+                {nextPriceMessage && (
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    {nextPriceMessage}
+                  </p>
+                )}
+
+              </div>
+
+              <div className="mt-4 rounded-xl border bg-background p-4">
+
+                {inputIsValid ? (
+                  <>
+
+                    <div className="flex items-center justify-between text-sm">
+
+                      <span className="text-muted-foreground">
+                        {quantity} ×{' '}
+                        {formatBRL(
+                          unitPriceCents,
+                        )}
+                      </span>
+
+                      <span className="font-semibold">
+                        {formatBRL(
+                          totalCents,
+                        )}
+                      </span>
+
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+
+                      <span className="text-base font-semibold">
+                        Total a pagar
+                      </span>
+
+                      <span className="text-2xl font-bold">
+                        {formatBRL(
+                          totalCents,
+                        )}
+                      </span>
+
+                    </div>
+
+                  </>
+                ) : (
+
+                  <div className="py-1 text-center">
+
+                    <p className="text-sm font-semibold text-red-500">
+                      Quantidade inválida
+                    </p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Digite um número inteiro entre 1 e 500.
+                    </p>
+
+                  </div>
+
+                )}
+
+              </div>
+
+              <ul className="mt-5 space-y-2.5">
+
+                <li className="flex items-center gap-3 text-sm">
+
+                  <Check className="size-4 shrink-0 text-primary" />
+
+                  <span className="text-muted-foreground">
+                    Telas simultâneas conforme quantidade comprada
+                  </span>
+
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+
+                  <Check className="size-4 shrink-0 text-primary" />
+
+                  <span className="text-muted-foreground">
+                    Acesso VIP por 30 dias
+                  </span>
+
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+
+                  <Check className="size-4 shrink-0 text-primary" />
+
+                  <span className="text-muted-foreground">
+                    Suporte via WhatsApp
+                  </span>
+
+                </li>
+
+                <li className="flex items-center gap-3 text-sm">
+
+                  <Check className="size-4 shrink-0 text-primary" />
+
+                  <span className="text-muted-foreground">
+                    Um único pagamento PIX
+                  </span>
+
+                </li>
+
+              </ul>
+
+              <Button
+                className="mt-5 h-11 w-full text-base"
+                onClick={handleBuy}
+                disabled={
+                  pending ||
+                  !product ||
+                  !inputIsValid
+                }
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="size-5 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    Comprar{' '}
+                    {inputIsValid
+                      ? quantity
+                      : '—'}{' '}
+                    {inputIsValid
+                      ? quantity === 1
+                        ? 'tela'
+                        : 'telas'
+                      : 'telas'}
+                  </>
+                )}
+              </Button>
+
+              {rateLimitMessage && (
+                <div
+                  role="alert"
+                  className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-center"
+                >
+                  <p className="text-sm font-semibold text-red-500">
+                    🚫 Limite de pedidos atingido
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {rateLimitMessage}
+                  </p>
+
+                </div>
               )}
-            </Button>
-          </div>
+
+            </div>
+          )}
+
         </div>
       </section>
 
       {payment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-background p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+
+          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
+
             <button
               type="button"
-              onClick={closePayment}
-              className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              onClick={() => {
+                setPayment(null)
+
+                setOrderStatus(
+                  'pending',
+                )
+              }}
+              className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Fechar"
             >
               <X className="size-5" />
             </button>
 
-            <div className="pr-8">
-              <h3 className="text-xl font-bold">
-                Pagamento PIX
-              </h3>
+            {paymentConfirmed ? (
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Escaneie o QR Code ou copie o código PIX.
-              </p>
-            </div>
+              <div className="py-6 text-center">
 
-            {paymentStatus === 'paid' ||
-            paymentStatus === 'delivered' ? (
-              <div className="py-8 text-center">
-                <CheckCircle2 className="mx-auto size-16 text-green-500" />
+                <div className="flex justify-center">
 
-                <h4 className="mt-4 text-xl font-bold">
-                  Pagamento confirmado!
-                </h4>
+                  <CheckCircle2 className="size-20 text-green-500" />
 
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Seu pedido foi confirmado com sucesso.
-                </p>
-
-                <Button
-                  className="mt-6 w-full"
-                  onClick={() => router.push('/minha-conta')}
-                >
-                  Ir para minha conta
-                </Button>
-              </div>
-            ) : paymentStatus === 'cancelled' ? (
-              <div className="py-8 text-center">
-                <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-destructive/10">
-                  <X className="size-8 text-destructive" />
                 </div>
 
-                <h4 className="mt-4 text-xl font-bold">
-                  Pagamento cancelado
-                </h4>
+                <h2 className="mt-5 text-2xl font-bold">
+                  Pagamento confirmado!
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Seu pagamento foi aprovado com sucesso.
+                </p>
 
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Este pagamento foi cancelado.
+                  Seus códigos já foram adicionados à sua conta.
                 </p>
 
                 <Button
-                  className="mt-6 w-full"
-                  onClick={closePayment}
+                  className="mt-8 w-full"
+                  onClick={() => {
+                    setPayment(null)
+
+                    router.push(
+                      '/minha-conta',
+                    )
+                  }}
+                >
+                  Ver meus códigos
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    setPayment(null)
+                  }}
                 >
                   Fechar
                 </Button>
+
               </div>
+
+            ) : orderStatus === 'cancelled' ? (
+
+              <div className="py-6 text-center">
+
+                <h2 className="text-2xl font-bold">
+                  Pagamento cancelado
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Este pagamento não foi aprovado.
+                </p>
+
+                <Button
+                  variant="outline"
+                  className="mt-8 w-full"
+                  onClick={() => {
+                    setPayment(null)
+                  }}
+                >
+                  Fechar
+                </Button>
+
+              </div>
+
             ) : (
-              <>
-                <div className="mt-6 flex justify-center">
-                  {payment.qrCodeBase64 ? (
-                    <img
-                      src={`data:image/png;base64,${payment.qrCodeBase64}`}
-                      alt="QR Code PIX"
-                      className="size-64 rounded-xl border bg-white p-2"
-                    />
-                  ) : (
-                    <div className="flex size-64 items-center justify-center rounded-xl border bg-muted">
-                      <Loader2 className="size-8 animate-spin" />
+
+              <div className="text-center">
+
+                <h2 className="text-2xl font-bold">
+                  Pague com PIX
+                </h2>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Escaneie o QR Code ou copie o código PIX.
+                </p>
+
+                {qrImage ? (
+
+                  <div className="mt-6 flex justify-center">
+
+                    <div className="rounded-xl bg-white p-3">
+
+                      <img
+                        src={qrImage}
+                        alt="QR Code PIX"
+                        className="h-56 w-56"
+                      />
+
                     </div>
-                  )}
-                </div>
 
-                <div className="mt-5">
-                  <p className="mb-2 text-sm font-medium">
-                    PIX Copia e Cola
-                  </p>
+                  </div>
 
-                  <div className="flex gap-2">
-                    <div className="min-w-0 flex-1 rounded-lg border bg-muted p-3">
-                      <p className="break-all text-xs text-muted-foreground">
-                        {payment.qrCode}
-                      </p>
+                ) : (
+
+                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
+                    O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
+                  </div>
+
+                )}
+
+                {payment.qrCode && (
+                  <>
+
+                    <div className="mt-6 max-h-24 overflow-auto rounded-lg border bg-muted p-3 text-left text-xs break-all">
+                      {payment.qrCode}
                     </div>
 
                     <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={copyPixCode}
-                      aria-label="Copiar código PIX"
+                      className="mt-4 w-full"
+                      onClick={
+                        copyPixCode
+                      }
                     >
-                      {copied ? (
-                        <Check className="size-4" />
-                      ) : (
-                        <Copy className="size-4" />
-                      )}
+                      <Copy className="size-4" />
+                      Copiar código PIX
                     </Button>
-                  </div>
+
+                  </>
+                )}
+
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+
+                  <Loader2 className="size-4 animate-spin text-primary" />
+
+                  <span>
+                    {checkingPayment
+                      ? 'Verificando pagamento...'
+                      : 'Aguardando confirmação do pagamento...'}
+                  </span>
+
                 </div>
 
-                <div className="mt-5 rounded-xl border bg-muted/30 p-4 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="size-4 animate-spin" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Esta página verifica automaticamente seu pagamento.
+                </p>
 
-                    <span className="text-sm font-medium">
-                      Aguardando pagamento...
-                    </span>
-                  </div>
+                <p className="mt-5 text-xs text-muted-foreground">
+                  Pedido: {payment.orderId}
+                </p>
 
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Esta tela será atualizada automaticamente.
-                  </p>
-                </div>
-              </>
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() => {
+                    setPayment(null)
+                  }}
+                >
+                  Fechar
+                </Button>
+
+              </div>
+
             )}
+
           </div>
+
         </div>
       )}
     </>
