@@ -43,14 +43,26 @@ type OrderStatus =
   | 'unknown'
 
 function getUnitPriceCents(quantity: number): number {
-  if (quantity >= 10) return 3300
-  if (quantity >= 5) return 3400
+  if (quantity >= 10) {
+    return 3300
+  }
+
+  if (quantity >= 5) {
+    return 3400
+  }
+
   return 3500
 }
 
 function getPriceLabel(quantity: number): string {
-  if (quantity >= 10) return 'R$ 33,00 por tela'
-  if (quantity >= 5) return 'R$ 34,00 por tela'
+  if (quantity >= 10) {
+    return 'R$ 33,00 por tela'
+  }
+
+  if (quantity >= 5) {
+    return 'R$ 34,00 por tela'
+  }
+
   return 'R$ 35,00 por tela'
 }
 
@@ -117,7 +129,9 @@ export function Pricing({
     null
 
   const inputIsValid =
-    isValidQuantityInput(quantityInput)
+    isValidQuantityInput(
+      quantityInput,
+    )
 
   const unitPriceCents =
     getUnitPriceCents(quantity)
@@ -132,7 +146,9 @@ export function Pricing({
     getNextPriceMessage(quantity)
 
   function changeQuantity(value: number) {
-    if (!Number.isFinite(value)) return
+    if (!Number.isFinite(value)) {
+      return
+    }
 
     const newQuantity = Math.max(
       1,
@@ -156,6 +172,7 @@ export function Pricing({
       toast.error(
         'Produto não encontrado.',
       )
+
       return
     }
 
@@ -163,6 +180,7 @@ export function Pricing({
       router.push(
         '/auth/sign-up?next=/minha-conta',
       )
+
       return
     }
 
@@ -176,6 +194,7 @@ export function Pricing({
       toast.error(
         'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
       )
+
       return
     }
 
@@ -192,10 +211,14 @@ export function Pricing({
       toast.error(
         'Quantidade inválida. Digite um número inteiro entre 1 e 500.',
       )
+
       return
     }
 
-    setQuantity(parsedQuantity)
+    setQuantity(
+      parsedQuantity,
+    )
+
     setQuantityInput(
       String(parsedQuantity),
     )
@@ -223,8 +246,10 @@ export function Pricing({
                 idempotencyKey,
             },
             body: JSON.stringify({
-              productId: product.id,
-              quantity: parsedQuantity,
+              productId:
+                product.id,
+              quantity:
+                parsedQuantity,
             }),
           },
         )
@@ -237,7 +262,8 @@ export function Pricing({
         ) {
           const retryAfter =
             Number(
-              res.retryAfter ?? 60,
+              res.retryAfter ??
+                60,
             )
 
           const seconds =
@@ -318,6 +344,11 @@ export function Pricing({
 
           return
         }
+
+        console.error(
+          'Erro no pagamento:',
+          res.error,
+        )
 
         toast.error(
           res.error ??
@@ -404,6 +435,11 @@ export function Pricing({
           return
         }
 
+        console.log(
+          'Status do pedido:',
+          data.status,
+        )
+
         const newStatus =
           (data.status as OrderStatus) ??
           'unknown'
@@ -479,36 +515,16 @@ export function Pricing({
     <>
       <section
         id="planos"
-        className="scroll-mt-20 bg-secondary/30 py-6 sm:py-8"
+        className="scroll-mt-20 bg-secondary/30 py-4 sm:py-6"
       >
-        <div className="mx-auto max-w-3xl px-4">
-
-          {/* CABEÇALHO */}
-
-          <div className="mx-auto max-w-2xl text-center">
-
-            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-              LD CLOUD VIP
-            </h2>
-
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-muted-foreground">
-              Escolha quantas telas você precisa e pague tudo em um único PIX.
-            </p>
-
-          </div>
-
-          {/* CARD */}
+        <div className="mx-auto max-w-2xl px-3 sm:px-4">
 
           {product && (
-            <div className="relative mx-auto mt-5 max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10 sm:p-4">
-
-              {/* BADGE */}
+            <div className="relative mx-auto max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10">
 
               <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 30 dias de acesso
               </div>
-
-              {/* PRODUTO */}
 
               <div className="text-center">
 
@@ -516,53 +532,39 @@ export function Pricing({
                   LD CLOUD VIP
                 </h3>
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Acesso VIP por 30 dias
-                </p>
+                <div className="mt-1 flex items-baseline justify-center gap-1.5">
 
-              </div>
-
-              {/* PREÇO */}
-
-              <div className="mt-3 text-center">
-
-                <div className="flex items-end justify-center gap-2">
-
-                  <span className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  <span className="text-3xl font-bold tracking-tight">
                     {formatBRL(
                       unitPriceCents,
                     )}
                   </span>
 
-                  <span className="mb-1 text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     / tela
                   </span>
 
                 </div>
 
-                <p className="mt-1 text-xs font-medium text-primary">
+                <p className="mt-0.5 text-xs font-medium text-primary">
                   {priceLabel}
                 </p>
 
               </div>
 
-              {/* QUANTIDADE */}
-
               <div className="mt-3">
 
-                <p className="mb-2 text-center text-xs font-semibold">
+                <p className="mb-1.5 text-center text-xs font-semibold">
                   Quantidade de telas
                 </p>
 
-                <div className="mx-auto flex max-w-sm items-center gap-3">
-
-                  {/* MENOS */}
+                <div className="flex items-center gap-2">
 
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-9 shrink-0"
+                    className="size-8 shrink-0"
                     onClick={() =>
                       changeQuantity(
                         quantity - 1,
@@ -576,8 +578,6 @@ export function Pricing({
                   >
                     <Minus className="size-4" />
                   </Button>
-
-                  {/* INPUT */}
 
                   <input
                     type="text"
@@ -609,7 +609,7 @@ export function Pricing({
                         )
                       }
                     }}
-                    className={`h-9 w-full rounded-lg border bg-background px-3 text-center text-base font-bold outline-none ${
+                    className={`h-8 w-full rounded-lg border bg-background px-3 text-center text-base font-bold outline-none ${
                       !inputIsValid
                         ? 'border-red-500 focus:border-red-500'
                         : ''
@@ -621,13 +621,11 @@ export function Pricing({
                     autoComplete="off"
                   />
 
-                  {/* MAIS */}
-
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-9 shrink-0"
+                    className="size-8 shrink-0"
                     onClick={() =>
                       changeQuantity(
                         quantity + 1,
@@ -644,189 +642,138 @@ export function Pricing({
 
                 </div>
 
-                {/* MENSAGEM DE VALIDAÇÃO */}
-
-                {!inputIsValid ? (
-                  <p className="mt-1 text-center text-[11px] font-medium text-red-500">
-                    Quantidade inválida. Digite um número inteiro entre 1 e 500.
-                  </p>
-                ) : (
-                  <p className="mt-1 text-center text-[11px] text-muted-foreground">
-                    Informe uma quantidade inteira de 1 a 500.
+                {!inputIsValid && (
+                  <p className="mt-1 text-center text-[10px] font-medium text-red-500">
+                    Digite uma quantidade entre 1 e 500.
                   </p>
                 )}
 
               </div>
 
-              {/* FAIXAS DE PREÇO */}
+              <div className="mt-2 grid grid-cols-3 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]">
 
-              <div className="mt-3 rounded-lg border bg-secondary/40 p-2.5">
-
-                <div className="grid grid-cols-3 gap-1 text-center text-xs">
-
-                  <div
-                    className={
-                      quantity < 5
-                        ? 'font-semibold text-primary'
-                        : 'text-muted-foreground'
-                    }
-                  >
+                <div
+                  className={
+                    quantity < 5
+                      ? 'font-semibold text-primary'
+                      : 'text-muted-foreground'
+                  }
+                >
+                  <div>
                     1–4 telas
-
-                    <br />
-
-                    <span className="text-[10px]">
-                      R$ 35,00 / tela
-                    </span>
                   </div>
 
-                  <div
-                    className={
-                      quantity >= 5 &&
-                      quantity < 10
-                        ? 'font-semibold text-primary'
-                        : 'text-muted-foreground'
-                    }
-                  >
+                  <div>
+                    R$ 35,00
+                  </div>
+                </div>
+
+                <div
+                  className={
+                    quantity >= 5 &&
+                    quantity < 10
+                      ? 'font-semibold text-primary'
+                      : 'text-muted-foreground'
+                  }
+                >
+                  <div>
                     5–9 telas
-
-                    <br />
-
-                    <span className="text-[10px]">
-                      R$ 34,00 / tela
-                    </span>
                   </div>
 
-                  <div
-                    className={
-                      quantity >= 10
-                        ? 'font-semibold text-primary'
-                        : 'text-muted-foreground'
-                    }
-                  >
+                  <div>
+                    R$ 34,00
+                  </div>
+                </div>
+
+                <div
+                  className={
+                    quantity >= 10
+                      ? 'font-semibold text-primary'
+                      : 'text-muted-foreground'
+                  }
+                >
+                  <div>
                     10+ telas
-
-                    <br />
-
-                    <span className="text-[10px]">
-                      R$ 33,00 / tela
-                    </span>
                   </div>
+
+                  <div>
+                    R$ 33,00
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
+
+                <span className="text-xs text-muted-foreground">
+                  {quantity} ×{' '}
+                  {formatBRL(
+                    unitPriceCents,
+                  )}
+                </span>
+
+                <div className="flex items-center gap-2">
+
+                  <span className="text-xs font-semibold">
+                    Total
+                  </span>
+
+                  <span className="text-lg font-bold">
+                    {formatBRL(
+                      totalCents,
+                    )}
+                  </span>
 
                 </div>
 
-                {nextPriceMessage && (
-                  <p className="mt-1 text-center text-[10px] text-muted-foreground">
-                    {nextPriceMessage}
-                  </p>
-                )}
-
               </div>
 
-              {/* TOTAL */}
+              <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
 
-              <div className="mt-3 rounded-lg border bg-background p-3">
+                <li className="flex items-center gap-1.5">
 
-                {inputIsValid ? (
-                  <>
-                    <div className="flex items-center justify-between text-sm">
+                  <Check className="size-3 shrink-0 text-primary" />
 
-                      <span className="text-muted-foreground">
-                        {quantity} ×{' '}
-                        {formatBRL(
-                          unitPriceCents,
-                        )}
-                      </span>
-
-                      <span className="font-semibold">
-                        {formatBRL(
-                          totalCents,
-                        )}
-                      </span>
-
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between">
-
-                      <span className="text-sm font-semibold">
-                        Total a pagar
-                      </span>
-
-                      <span className="text-xl font-bold">
-                        {formatBRL(
-                          totalCents,
-                        )}
-                      </span>
-
-                    </div>
-
-                  </>
-                ) : (
-                  <div className="py-1 text-center">
-
-                    <p className="text-sm font-semibold text-red-500">
-                      Quantidade inválida
-                    </p>
-
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Digite um número inteiro entre 1 e 500.
-                    </p>
-
-                  </div>
-                )}
-
-              </div>
-
-              {/* BENEFÍCIOS */}
-
-              <ul className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1">
-
-                <li className="flex items-center gap-1.5 text-[11px]">
-
-                  <Check className="size-3.5 shrink-0 text-primary" />
-
-                  <span className="text-muted-foreground">
-                    Telas simultâneas conforme quantidade comprada
+                  <span>
+                    30 dias de acesso VIP
                   </span>
 
                 </li>
 
-                <li className="flex items-center gap-1.5 text-[11px]">
+                <li className="flex items-center gap-1.5">
 
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
 
-                  <span className="text-muted-foreground">
-                    Acesso VIP por 30 dias
+                  <span>
+                    Telas simultâneas
                   </span>
 
                 </li>
 
-                <li className="flex items-center gap-1.5 text-[11px]">
+                <li className="flex items-center gap-1.5">
 
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
 
-                  <span className="text-muted-foreground">
+                  <span>
                     Suporte via WhatsApp
                   </span>
 
                 </li>
 
-                <li className="flex items-center gap-1.5 text-[11px]">
+                <li className="flex items-center gap-1.5">
 
-                  <Check className="size-3.5 shrink-0 text-primary" />
+                  <Check className="size-3 shrink-0 text-primary" />
 
-                  <span className="text-muted-foreground">
-                    Um único pagamento PIX
+                  <span>
+                    Pagamento PIX
                   </span>
 
                 </li>
 
               </ul>
 
-              {/* BOTÃO */}
-
               <Button
-                className="mt-3 h-10 w-full text-sm"
+                className="mt-2 h-9 w-full text-sm"
                 onClick={handleBuy}
                 disabled={
                   pending ||
@@ -836,7 +783,7 @@ export function Pricing({
               >
                 {pending ? (
                   <>
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" />
                     Processando...
                   </>
                 ) : (
@@ -854,4 +801,87 @@ export function Pricing({
                 )}
               </Button>
 
-              {rateLimitMessage
+              {rateLimitMessage && (
+                <div
+                  role="alert"
+                  className="mt-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-center"
+                >
+
+                  <p className="text-xs font-semibold text-red-500">
+                    🚫 Limite de pedidos atingido
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    {rateLimitMessage}
+                  </p>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      </section>
+
+      {payment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+
+          <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
+
+            <button
+              type="button"
+              onClick={() => {
+                setPayment(null)
+
+                setOrderStatus(
+                  'pending',
+                )
+              }}
+              className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Fechar"
+            >
+              <X className="size-5" />
+            </button>
+
+            {paymentConfirmed ? (
+
+              <div className="py-6 text-center">
+
+                <div className="flex justify-center">
+
+                  <CheckCircle2 className="size-20 text-green-500" />
+
+                </div>
+
+                <h2 className="mt-5 text-2xl font-bold">
+                  Pagamento confirmado!
+                </h2>
+
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Seu pagamento foi aprovado com sucesso.
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Seus códigos já foram adicionados à sua conta.
+                </p>
+
+                <Button
+                  className="mt-8 w-full"
+                  onClick={() => {
+                    setPayment(null)
+
+                    router.push(
+                      '/minha-conta',
+                    )
+                  }}
+                >
+                  Ver meus códigos
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    setPayment(null)
+              
