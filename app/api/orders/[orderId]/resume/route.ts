@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
+const ORDER_EXPIRATION_MINUTES = 30
 
 export async function GET(
   _request: Request,
@@ -35,7 +35,7 @@ export async function GET(
     return NextResponse.json({ ok: false, error: 'Você não pode acessar este pagamento.' }, { status: 403 })
   }
 
-  const expiresAt = new Date(order.created_at).getTime() + 10 * 60 * 1000
+  const expiresAt = new Date(order.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000
 
   if (order.status !== 'pending' || Date.now() >= expiresAt || !order.payment_preference_id) {
     if (order.status === 'pending' && Date.now() >= expiresAt) {
