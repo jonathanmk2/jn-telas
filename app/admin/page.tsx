@@ -308,8 +308,9 @@ export default async function AdminPage() {
                         {sale.userEmail ?? 'Cliente não identificado'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {sale.quantity} código(s)
-                        {sale.productName ? ` • ${sale.productName}` : ''}
+                        {sale.quantity === 1
+                          ? '1 Tela JN TELAS'
+                          : `${sale.quantity} Telas JN TELAS`}
                         {' • '}
                         {new Date(sale.created_at).toLocaleDateString('pt-BR')}
                       </p>
