@@ -21,32 +21,7 @@ export default async function HomePage() {
 
   let user: { email?: string | null } | null = null
 
-  // Planos padrão
-  let products: Product[] = [
-    {
-      id: 'plano-1-tela',
-      name: '1 Tela LD CLOUD VIP',
-      screens: 1,
-      price_cents: 3500,
-      description: 'Versão VIP • Acesso por 30 dias',
-    },
-    {
-      id: 'plano-5-telas',
-      name: '5 Telas LD CLOUD VIP',
-      screens: 5,
-      price_cents: 17000,
-      description: 'Versão VIP • Acesso por 30 dias',
-    },
-    {
-      id: 'plano-10-telas',
-      name: '10 Telas LD CLOUD VIP',
-      screens: 10,
-      price_cents: 33000,
-      description: 'Versão VIP • Acesso por 30 dias',
-    },
-  ]
-
-  let isAdmin = false
+  let products: Product[] = []
 
   if (hasSupabase) {
     try {
@@ -58,14 +33,19 @@ export default async function HomePage() {
 
       user = sessionUser
 
-      const { data } = await supabase
+      const { data, error: productsError } = await supabase
         .from('products')
-        .select('id, name, screens, price_cents, description')
+        .select('id, name, screens, price_cents')
         .eq('active', true)
         .order('screens', { ascending: true })
 
-      if (data && data.length > 0) {
-        products = data as Product[]
+      if (productsError) {
+        console.error('Erro ao carregar produtos:', productsError)
+      } else if (data) {
+        products = data.map((item) => ({
+          ...item,
+          description: null,
+        })) as Product[]
       }
 
       if (sessionUser) {
@@ -82,6 +62,32 @@ export default async function HomePage() {
     }
   }
 
+  if (!hasSupabase) {
+    products = [
+      {
+        id: 'plano-1-tela',
+        name: '1 Tela LD CLOUD VIP',
+        screens: 1,
+        price_cents: 3500,
+        description: 'Versão VIP • Acesso por 30 dias',
+      },
+      {
+        id: 'plano-5-telas',
+        name: '5 Telas LD CLOUD VIP',
+        screens: 5,
+        price_cents: 17000,
+        description: 'Versão VIP • Acesso por 30 dias',
+      },
+      {
+        id: 'plano-10-telas',
+        name: '10 Telas LD CLOUD VIP',
+        screens: 10,
+        price_cents: 33000,
+        description: 'Versão VIP • Acesso por 30 dias',
+      },
+    ]
+  }
+
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteNavbar
@@ -91,13 +97,11 @@ export default async function HomePage() {
       <main className="flex-1">
         <Hero />
 
-        {/* CARD DE VENDA — MANTIDO ORIGINAL */}
         <Pricing
           products={products}
           isLoggedIn={!!user}
         />
 
-        {/* DEMAIS INFORMAÇÕES ABAIXO */}
         <Benefits />
         <Faq />
         <Support />
