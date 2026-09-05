@@ -672,8 +672,8 @@ export async function POST(request: Request) {
       total_amount: amount,
       description:
         quantity === 1
-          ? product.name
-          : `${quantity} telas - ${product.name}`,
+          ? '1 Tela JN TELAS'
+          : `${quantity} Telas JN TELAS`,
       payer: {
         email: user.email ?? undefined,
       },
