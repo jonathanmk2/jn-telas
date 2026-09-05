@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const ORDER_EXPIRATION_MINUTES = 30
+
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
@@ -27,7 +29,7 @@ export async function GET() {
 
   if (!order) return NextResponse.json({ ok: true, pending: null })
 
-  const expiresAtMs = new Date(order.created_at).getTime() + 10 * 60 * 1000
+  const expiresAtMs = new Date(order.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000
 
   if (Date.now() >= expiresAtMs) {
     await admin.rpc('cancel_pending_order', {
