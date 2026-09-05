@@ -282,6 +282,20 @@ export function Pricing({
 
   const paymentConfirmed = orderStatus === 'paid' || orderStatus === 'delivered'
 
+  function closePaymentModal() {
+    const wasConfirmed = paymentConfirmed
+
+    setPayment(null)
+    setOrderStatus('pending')
+
+    if (wasConfirmed) {
+      // A confirmação permanece aberta até o cliente fechar.
+      // Só depois do fechamento fazemos uma navegação completa para
+      // garantir que Minha Conta busque o pedido e os códigos atualizados.
+      window.location.href = `/minha-conta?updated=${Date.now()}`
+    }
+  }
+
   return (
     <>
       <section
@@ -456,10 +470,7 @@ export function Pricing({
           <div className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
             <button
               type="button"
-              onClick={() => {
-                setPayment(null)
-                setOrderStatus('pending')
-              }}
+              onClick={closePaymentModal}
               className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Fechar"
             >
@@ -473,17 +484,14 @@ export function Pricing({
                 <p className="mt-3 text-sm text-muted-foreground">Seu pagamento foi aprovado com sucesso.</p>
                 <Button
                   className="mt-8 w-full"
-                  onClick={() => {
-                    setPayment(null)
-                    router.push('/minha-conta')
-                  }}
+                  onClick={closePaymentModal}
                 >
                   Ver meus códigos
                 </Button>
                 <Button
                   variant="outline"
                   className="mt-3 w-full"
-                  onClick={() => setPayment(null)}
+                  onClick={closePaymentModal}
                 >
                   Fechar
                 </Button>
@@ -492,42 +500,22 @@ export function Pricing({
               <div className="py-6 text-center">
                 <h2 className="text-2xl font-bold">Pagamento cancelado</h2>
                 <p className="mt-3 text-sm text-muted-foreground">Este pagamento não foi aprovado.</p>
-                <Button variant="outline" className="mt-8 w-full" onClick={() => setPayment(null)}>
+                <Button variant="outline" className="mt-8 w-full" onClick={closePaymentModal}>
                   Fechar
                 </Button>
               </div>
             ) : (
               <div className="text-center">
-                <h2 className="text-2xl font-bold">Pague com PIX</h2>
-                <p className="mt-2 text-sm text-muted-foreground">Escaneie o QR Code ou copie o código PIX.</p>
-
-                {qrImage ? (
-                  <div className="mt-6 flex justify-center">
-                    <div className="rounded-xl bg-white p-3">
-                      <img src={qrImage} alt="QR Code PIX" className="h-56 w-56" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-6 rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm">
-                    O pagamento foi criado, mas o QR Code não foi encontrado na resposta.
-                  </div>
-                )}
-
-                {payment.qrCode && (
-                  <>
-                    <div className="mt-6 max-h-28 overflow-auto rounded-xl border bg-muted/30 p-3 text-left text-xs break-all">
-                      {payment.qrCode}
-                    </div>
-                    <Button className="mt-3 w-full" onClick={copyPixCode}>
-                      <Copy className="size-4" />
-                      Copiar código PIX
-                    </Button>
-                  </>
-                )}
-
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {checkingPayment ? 'Aguardando confirmação do pagamento...' : 'Após o pagamento, a confirmação será automática.'}
-                </p>
+                <h2 className="text-xl font-bold">Pagamento PIX</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Escaneie o QR Code ou copie o código PIX para concluir o pagamento.</p>
+                {qrImage && <div className="mt-4 flex justify-center"><div className="rounded-xl bg-white p-3"><img src={qrImage} alt="QR Code PIX" className="h-64 w-64" /></div></div>}
+                <Button className="mt-4 w-full" onClick={copyPixCode} disabled={!payment.qrCode || checkingPayment}>
+                  <Copy className="size-4" />
+                  Copiar código PIX
+                </Button>
+                <Button variant="outline" className="mt-3 w-full" onClick={closePaymentModal}>
+                  Fechar
+                </Button>
               </div>
             )}
           </div>
