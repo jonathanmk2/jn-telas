@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Copy, Loader2, X } from 'lucide-react'
-import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
 import { toast } from 'sonner'
@@ -15,15 +14,16 @@ type PendingOrder = {
   expiresAt: string
 }
 
+type PaymentState = 'pending' | 'confirmed' | 'cancelled' | null
+
 export function PendingPayment() {
-  const pathname = usePathname()
   const [order, setOrder] = useState<PendingOrder | null>(null)
   const [payment, setPayment] = useState<{ qrCode: string | null; qrCodeBase64: string | null } | null>(null)
+  const [paymentState, setPaymentState] = useState<PaymentState>(null)
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
-    if (pathname !== '/minha-conta') return
     let active = true
 
     async function load() {
@@ -31,19 +31,77 @@ export function PendingPayment() {
         const response = await fetch('/api/orders/pending', { cache: 'no-store' })
         if (!response.ok) return
         const data = await response.json()
-        if (active) setOrder(data.pending ?? null)
+        if (!active) return
+
+        const nextOrder = data.pending ?? null
+        setOrder(nextOrder)
+
+        if (!nextOrder) {
+          setPayment(null)
+          setPaymentState(null)
+        } else {
+          setPaymentState('pending')
+        }
       } catch {
-        // A página de conta não deve falhar por causa deste aviso.
+        // O aviso não deve impedir a navegação do cliente.
       }
     }
 
     load()
-    const interval = setInterval(load, 15000)
+    const interval = setInterval(load, 3000)
     return () => {
       active = false
       clearInterval(interval)
     }
-  }, [pathname])
+  }, [])
+
+  useEffect(() => {
+    if (!order?.orderId || paymentState !== 'pending') return
+
+    let active = true
+
+    async function checkPayment() {
+      try {
+        const response = await fetch(
+          `/api/payment-status?orderId=${order.orderId}`,
+          { cache: 'no-store' },
+        )
+
+        if (!active) return
+
+        if (response.status === 410 || response.status === 404) {
+          setOrder(null)
+          setPayment(null)
+          setPaymentState('cancelled')
+          return
+        }
+
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (!active) return
+
+        if (data.status === 'paid' || data.status === 'delivered') {
+          setPaymentState('confirmed')
+          setPayment(null)
+          toast.success('Pagamento confirmado com sucesso!')
+        } else if (data.status === 'cancelled') {
+          setPaymentState('cancelled')
+          setPayment(null)
+          toast.error('Este pagamento foi cancelado.')
+        }
+      } catch {
+        // Uma falha momentânea não interrompe a verificação.
+      }
+    }
+
+    checkPayment()
+    const interval = setInterval(checkPayment, 3000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [order?.orderId, paymentState])
 
   async function resumePayment() {
     if (!order) return
@@ -55,11 +113,14 @@ export function PendingPayment() {
 
       if (!response.ok) {
         setOrder(null)
+        setPayment(null)
+        setPaymentState('cancelled')
         toast.error(data.error ?? 'Este pagamento expirou.')
         return
       }
 
       setPayment({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64 })
+      setPaymentState('pending')
     } catch {
       toast.error('Não foi possível recuperar o PIX.')
     } finally {
@@ -82,6 +143,7 @@ export function PendingPayment() {
 
       setPayment(null)
       setOrder(null)
+      setPaymentState('cancelled')
       toast.success('Pagamento cancelado. O estoque foi liberado.')
     } catch {
       toast.error('Não foi possível cancelar o pagamento.')
@@ -100,7 +162,31 @@ export function PendingPayment() {
     }
   }
 
-  if (pathname !== '/minha-conta' || !order) return null
+  if (paymentState === 'confirmed') {
+    return (
+      <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/30 bg-background p-4 shadow-2xl">
+        <button
+          type="button"
+          onClick={() => setPaymentState(null)}
+          className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+          aria-label="Fechar confirmação"
+        >
+          <X className="size-4" />
+        </button>
+        <div className="flex items-center gap-3 pr-6">
+          <CheckCircle2 className="size-9 shrink-0 text-emerald-500" />
+          <div>
+            <p className="text-sm font-bold">Pagamento confirmado!</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!order || paymentState === 'cancelled') return null
 
   const qrImage = payment?.qrCodeBase64
     ? payment.qrCodeBase64.startsWith('data:image')
