@@ -68,9 +68,9 @@ export async function POST(request: Request) {
     'check_order_rate_limit',
     {
       p_user_id: user.id,
-      p_ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      p_ip_address: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
       p_limit: 5,
-      p_window_minutes: 1,
+      p_window_seconds: 60,
     },
   )
 
