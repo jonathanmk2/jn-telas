@@ -51,11 +51,7 @@ export async function POST(request: Request) {
 
   const requestedQuantity = Number(body.quantity)
 
-  if (
-    !Number.isInteger(requestedQuantity) ||
-    requestedQuantity < 1 ||
-    requestedQuantity > 500
-  ) {
+  if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > 500) {
     return NextResponse.json(
       { ok: false, error: 'Quantidade inválida. Escolha entre 1 e 500 telas.' },
       { status: 400 },
@@ -177,8 +173,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // O product_id no banco é UUID. Não confiamos no ID enviado pelo navegador:
-  // o produto válido é resolvido no servidor pela configuração de 1 tela.
   const { data: product, error: productError } = await admin
     .from('products')
     .select('id')
@@ -256,8 +250,16 @@ export async function POST(request: Request) {
     },
   )
 
-  if (reservationError || Number(reservedCount ?? 0) !== quantity) {
-    console.error('Erro ao reservar códigos:', reservationError, reservedCount)
+  const reservedQuantity = typeof reservedCount === 'number' ? reservedCount : Number(reservedCount)
+
+  if (reservationError || !Number.isFinite(reservedQuantity) || reservedQuantity !== quantity) {
+    console.error('Erro ao reservar códigos:', {
+      error: reservationError,
+      rawResult: reservedCount,
+      normalizedResult: reservedQuantity,
+      requestedQuantity: quantity,
+      orderId: order.id,
+    })
 
     await admin.rpc('release_activation_code_reservations', {
       p_order_id: order.id,
