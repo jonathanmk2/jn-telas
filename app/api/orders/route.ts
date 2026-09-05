@@ -8,6 +8,8 @@ type OrderRequest = {
   quantity?: unknown
 }
 
+const ORDER_EXPIRATION_MINUTES = 30
+
 function getBackendUnitPrice(quantity: number) {
   if (quantity >= 10) return 3300
   if (quantity >= 5) return 3400
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
     if (
       existingByIdempotency.status === 'pending' &&
       existingByIdempotency.created_at &&
-      new Date(existingByIdempotency.created_at).getTime() <= Date.now() - 10 * 60 * 1000
+      new Date(existingByIdempotency.created_at).getTime() <= Date.now() - ORDER_EXPIRATION_MINUTES * 60 * 1000
     ) {
       await admin.rpc('cancel_pending_order', {
         p_order_id: existingByIdempotency.id,
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
   }
 
   if (existingPending) {
-    const expiresAt = new Date(existingPending.created_at).getTime() + 10 * 60 * 1000
+    const expiresAt = new Date(existingPending.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000
 
     if (Date.now() >= expiresAt) {
       const { data: cancelled, error: cancelError } = await admin.rpc('cancel_pending_order', {
@@ -246,7 +248,7 @@ export async function POST(request: Request) {
     {
       p_order_id: order.id,
       p_quantity: quantity,
-      p_minutes: 10,
+      p_minutes: ORDER_EXPIRATION_MINUTES,
     },
   )
 
@@ -306,6 +308,7 @@ export async function POST(request: Request) {
             id: 'pix',
             type: 'bank_transfer',
           },
+          expiration_time: 'PT30M',
         },
       ],
     },
