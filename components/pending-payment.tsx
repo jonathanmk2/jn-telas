@@ -34,13 +34,14 @@ export function PendingPayment() {
         if (!active) return
 
         const nextOrder = data.pending ?? null
-        setOrder(nextOrder)
 
-        if (!nextOrder) {
-          setPayment(null)
-          setPaymentState(null)
-        } else {
+        if (nextOrder) {
+          setOrder(nextOrder)
           setPaymentState('pending')
+        } else {
+          setOrder((currentOrder) => currentOrder)
+          setPayment((currentPayment) => currentPayment)
+          setPaymentState((currentState) => currentState === 'confirmed' ? currentState : null)
         }
       } catch {
         // O aviso não deve impedir a navegação do cliente.
