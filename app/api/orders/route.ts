@@ -49,7 +49,15 @@ export async function POST(request: Request) {
     )
   }
 
+  const productId = typeof body.productId === 'string' ? body.productId.trim() : ''
   const requestedQuantity = Number(body.quantity)
+
+  if (!productId) {
+    return NextResponse.json(
+      { ok: false, error: 'Produto inválido.' },
+      { status: 400 },
+    )
+  }
 
   if (
     !Number.isInteger(requestedQuantity) ||
@@ -184,7 +192,7 @@ export async function POST(request: Request) {
     .from('orders')
     .insert({
       user_id: user.id,
-      product_id: null,
+      product_id: productId,
       quantity,
       status: 'pending',
       total_cents: totalCents,
