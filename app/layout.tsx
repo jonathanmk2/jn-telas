@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Suspense } from 'react'
 import './globals.css'
+import { PendingPayment } from '@/components/pending-payment'
 
 const geistSans = Geist({
   subsets: ['latin'],
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} bg-background`}>
       <body className="font-sans antialiased">
         <Suspense fallback={null}>{children}</Suspense>
+        <PendingPayment />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
