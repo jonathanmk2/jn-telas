@@ -6,7 +6,7 @@ export function Hero() {
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_0%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent)]" />
-      <div className="relative mx-auto max-w-6xl px-4 py-20 text-center md:py-28">
+      <div className="relative mx-auto max-w-6xl px-4 pt-20 pb-8 text-center md:py-28">
         <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
           <MonitorSmartphone className="size-3.5" /> Telas virtuais e acesso remoto
         </span>
