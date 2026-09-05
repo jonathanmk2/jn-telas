@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const { data: order, error } = await admin
       .from('orders')
-      .select('id, user_id, status, activation_code_id, created_at')
+      .select('id, user_id, status, activation_code_id, payment_preference_id, created_at')
       .eq('id', orderId)
       .maybeSingle()
 
@@ -36,25 +36,95 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Você não pode consultar este pedido.' }, { status: 403 })
     }
 
-    if (order.status === 'pending' && Date.now() >= new Date(order.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000) {
+    // Fallback de confirmação: se o webhook do Mercado Pago ainda não processou
+    // o pagamento, consultamos o pedido diretamente no Mercado Pago e executamos
+    // o mesmo fluxo de entrega usado pelo webhook. Isso evita pagamento aprovado
+    // ficar preso em PENDING/PAID sem entregar os códigos.
+    if (
+      (order.status === 'pending' || order.status === 'paid') &&
+      order.payment_preference_id
+    ) {
+      const mercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
+
+      if (mercadoPagoToken) {
+        try {
+          const mercadoPagoResponse = await fetch(
+            `https://api.mercadopago.com/v1/orders/${encodeURIComponent(order.payment_preference_id)}`,
+            {
+              headers: { Authorization: `Bearer ${mercadoPagoToken}` },
+              cache: 'no-store',
+            },
+          )
+
+          if (mercadoPagoResponse.ok) {
+            const mercadoPagoOrder = await mercadoPagoResponse.json()
+            const transaction =
+              mercadoPagoOrder.transactions?.payments?.[0] ??
+              mercadoPagoOrder.transaction?.payments?.[0] ??
+              mercadoPagoOrder.payments?.[0] ??
+              null
+
+            const paymentStatus = String(
+              transaction?.status ?? mercadoPagoOrder.status ?? '',
+            ).toLowerCase()
+
+            if (['approved', 'processed', 'accredited'].includes(paymentStatus)) {
+              const { processPayment } = await import('@/app/api/mercadopago/webhook/route')
+
+              await processPayment({
+                admin,
+                orderId: order.id,
+                paymentId: transaction?.id
+                  ? String(transaction.id)
+                  : String(mercadoPagoOrder.id),
+                paymentStatus,
+              })
+            }
+          } else {
+            console.error(
+              'Erro ao consultar pedido Mercado Pago no fallback:',
+              mercadoPagoResponse.status,
+              await mercadoPagoResponse.text(),
+            )
+          }
+        } catch (error) {
+          console.error('Erro no fallback de confirmação Mercado Pago:', error)
+        }
+      }
+    }
+
+    const { data: refreshedOrder, error: refreshedError } = await admin
+      .from('orders')
+      .select('id, user_id, status, activation_code_id, created_at')
+      .eq('id', order.id)
+      .maybeSingle()
+
+    if (refreshedError || !refreshedOrder) {
+      return NextResponse.json({ ok: false, error: 'Não foi possível atualizar o status do pedido.' }, { status: 500 })
+    }
+
+    if (
+      refreshedOrder.status === 'pending' &&
+      Date.now() >= new Date(refreshedOrder.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000
+    ) {
       await admin.rpc('cancel_pending_order', {
-        p_order_id: order.id,
+        p_order_id: refreshedOrder.id,
         p_user_id: user.id,
       })
 
       return NextResponse.json({ ok: false, expired: true, error: 'Pagamento expirado.' }, { status: 410 })
     }
 
-    const isDelivered = order.status === 'delivered'
-    const isPaid = order.status === 'paid' || isDelivered
+    const isDelivered = refreshedOrder.status === 'delivered'
+    const isPaid = refreshedOrder.status === 'paid' || isDelivered
 
     return NextResponse.json({
       ok: true,
-      orderId: order.id,
-      status: order.status,
+      orderId: refreshedOrder.id,
+      status: refreshedOrder.status,
       paid: isPaid,
       delivered: isDelivered,
-      activationCodeId: order.activation_code_id,
+      activationCodeId: refreshedOrder.activation_code_id,
     })
   } catch (error) {
     console.error('Erro inesperado ao verificar pagamento:', error)
