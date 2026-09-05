@@ -121,7 +121,13 @@ export async function processPayment({
   const cancelledStatuses = ['rejected', 'cancelled', 'failed']
 
   if (paidStatuses.includes(normalizedStatus)) {
-    if (order.status !== 'paid') {
+    // Nunca entregue um pagamento aprovado em um pedido já cancelado.
+    if (order.status === 'cancelled') {
+      console.error('Pagamento aprovado para pedido já cancelado; entrega bloqueada.', order.id)
+      return
+    }
+
+    if (order.status === 'pending') {
       const { error } = await admin
         .from('orders')
         .update({
@@ -136,24 +142,74 @@ export async function processPayment({
         console.error('Erro ao marcar pedido como pago:', error)
         return
       }
+    } else if (order.status !== 'paid') {
+      console.error('Status inesperado para pagamento aprovado; entrega bloqueada.', {
+        orderId: order.id,
+        status: order.status,
+      })
+      return
     }
 
+    const now = new Date().toISOString()
     const { data: reservations, error: reservationError } = await admin
       .from('activation_code_reservations')
       .select('activation_code_id')
       .eq('order_id', order.id)
-      .gt('expires_at', new Date().toISOString())
+      .gt('expires_at', now)
 
     if (reservationError) {
       console.error('Erro ao buscar códigos reservados:', reservationError)
       return
     }
 
-    const reservationIds = (reservations ?? []).map((item) => item.activation_code_id)
+    let reservationIds = (reservations ?? []).map((item) => item.activation_code_id)
     const quantity = Number(order.quantity) || 1
 
+    // Se o pagamento chegou depois do prazo da reserva, recuperamos a reserva
+    // antes de tentar entregar. Isso evita pedidos pagos presos em PAID.
+    if (reservationIds.length < quantity) {
+      const missingQuantity = quantity - reservationIds.length
+
+      const { data: reservedCount, error: reserveError } = await admin.rpc(
+        'reserve_activation_codes',
+        {
+          p_order_id: order.id,
+          p_quantity: missingQuantity,
+          p_minutes: 30,
+        },
+      )
+
+      if (reserveError) {
+        console.error('Erro ao recuperar reserva após pagamento:', reserveError, {
+          orderId: order.id,
+          missingQuantity,
+        })
+        return
+      }
+
+      const { data: refreshedReservations, error: refreshedReservationError } = await admin
+        .from('activation_code_reservations')
+        .select('activation_code_id')
+        .eq('order_id', order.id)
+        .gt('expires_at', new Date().toISOString())
+
+      if (refreshedReservationError) {
+        console.error('Erro ao verificar reserva recuperada:', refreshedReservationError)
+        return
+      }
+
+      reservationIds = (refreshedReservations ?? []).map((item) => item.activation_code_id)
+
+      console.log('Reserva recuperada após pagamento:', {
+        orderId: order.id,
+        requested: missingQuantity,
+        reserved: Number(reservedCount) || 0,
+        totalReserved: reservationIds.length,
+      })
+    }
+
     if (reservationIds.length !== quantity) {
-      console.error('Pagamento aprovado sem reserva completa; pedido permanece PAID para análise manual.', {
+      console.error('Pagamento aprovado sem estoque/reserva completa; pedido permanece PAID.', {
         orderId: order.id,
         expected: quantity,
         reserved: reservationIds.length,
@@ -180,7 +236,11 @@ export async function processPayment({
     }
 
     if ((assignedCodes ?? []).length !== quantity) {
-      console.error('Nem todos os códigos reservados puderam ser atribuídos:', order.id)
+      console.error('Nem todos os códigos reservados puderam ser atribuídos:', {
+        orderId: order.id,
+        expected: quantity,
+        assigned: assignedCodes?.length ?? 0,
+      })
       return
     }
 
@@ -203,7 +263,7 @@ export async function processPayment({
       .delete()
       .eq('order_id', order.id)
 
-    console.log('Pedido entregue usando somente os códigos reservados:', order.id)
+    console.log('Pedido entregue usando os códigos reservados/recuperados:', order.id)
     return
   }
 
