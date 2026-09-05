@@ -9,12 +9,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  /*
-   * =========================================================
-   * PROTEÇÃO DO PAINEL ADMIN
-   * =========================================================
-   */
-
   const supabase = await createClient()
 
   const {
@@ -33,23 +27,13 @@ export default async function AdminPage() {
       .maybeSingle()
 
   if (profileError) {
-    console.error(
-      'Erro ao verificar administrador:',
-      profileError,
-    )
-
+    console.error('Erro ao verificar administrador:', profileError)
     redirect('/minha-conta')
   }
 
   if (profile?.is_admin !== true) {
     redirect('/minha-conta')
   }
-
-  /*
-   * =========================================================
-   * CLIENT ADMINISTRATIVO
-   * =========================================================
-   */
 
   const admin = createAdminClient()
 
@@ -58,123 +42,56 @@ export default async function AdminPage() {
     codesResult,
     ordersResult,
     productsResult,
-    auditLogsResult,
   ] = await Promise.all([
     admin
       .from('profiles')
-      .select(
-        'id, email, full_name, created_at',
-      )
-      .order('created_at', {
-        ascending: false,
-      }),
+      .select('id, email, full_name, created_at')
+      .order('created_at', { ascending: false }),
 
     admin
       .from('activation_codes')
-      .select(
-        'id, code, status, created_at, assigned_at, user_id, product_id, order_id',
-      )
-      .order('created_at', {
-        ascending: false,
-      }),
+      .select('id, code, status, created_at, assigned_at, user_id, product_id, order_id')
+      .order('created_at', { ascending: false }),
 
     admin
       .from('orders')
-      .select(
-        'id, status, total_cents, quantity, created_at, user_id, product_id',
-      )
-      .order('created_at', {
-        ascending: false,
-      }),
+      .select('id, status, total_cents, quantity, created_at, user_id, product_id')
+      .order('created_at', { ascending: false }),
 
     admin
       .from('products')
       .select('id, name')
-      .order('name', {
-        ascending: true,
-      }),
-
-    admin
-      .from('admin_audit_logs')
-      .select(
-        'id, admin_id, action, entity_type, entity_id, description, metadata, created_at',
-      )
-      .order('created_at', {
-        ascending: false,
-      })
-      .limit(50),
+      .order('name', { ascending: true }),
   ])
 
   if (profilesResult.error) {
-    console.error(
-      'Erro ao carregar clientes:',
-      profilesResult.error,
-    )
+    console.error('Erro ao carregar clientes:', profilesResult.error)
   }
 
   if (codesResult.error) {
-    console.error(
-      'Erro ao carregar códigos:',
-      codesResult.error,
-    )
+    console.error('Erro ao carregar códigos:', codesResult.error)
   }
 
   if (ordersResult.error) {
-    console.error(
-      'Erro ao carregar pedidos:',
-      ordersResult.error,
-    )
+    console.error('Erro ao carregar pedidos:', ordersResult.error)
   }
 
   if (productsResult.error) {
-    console.error(
-      'Erro ao carregar produtos:',
-      productsResult.error,
-    )
-  }
-
-  if (auditLogsResult.error) {
-    console.error(
-      'Erro ao carregar histórico administrativo:',
-      auditLogsResult.error,
-    )
+    console.error('Erro ao carregar produtos:', productsResult.error)
   }
 
   const profiles = profilesResult.data ?? []
   const codes = codesResult.data ?? []
   const orders = ordersResult.data ?? []
   const products = productsResult.data ?? []
-  const auditLogs = auditLogsResult.data ?? []
-
-  /*
-   * =========================================================
-   * MAPAS AUXILIARES
-   * =========================================================
-   */
 
   const profileMap = new Map(
-    profiles.map((profile) => [
-      profile.id,
-      profile,
-    ]),
+    profiles.map((profile) => [profile.id, profile]),
   )
 
   const productMap = new Map(
-    products.map((product) => [
-      product.id,
-      product,
-    ]),
+    products.map((product) => [product.id, product]),
   )
-
-  /*
-   * =========================================================
-   * RESUMO DE VENDAS
-   * =========================================================
-   * Consideramos faturamento e códigos vendidos apenas dos
-   * pedidos pagos ou entregues. Pedidos pendentes/cancelados
-   * não entram no faturamento.
-   * =========================================================
-   */
 
   const completedOrders = orders.filter(
     (order) =>
@@ -184,268 +101,122 @@ export default async function AdminPage() {
 
   const salesSummary = {
     revenueCents: completedOrders.reduce(
-      (total, order) =>
-        total + (order.total_cents ?? 0),
+      (total, order) => total + (order.total_cents ?? 0),
       0,
     ),
-
     orders: orders.length,
-
     completedOrders: completedOrders.length,
-
     codesSold: completedOrders.reduce(
-      (total, order) =>
-        total + (order.quantity ?? 0),
+      (total, order) => total + (order.quantity ?? 0),
       0,
     ),
-
     availableStock: codes.filter(
-      (code) =>
-        code.status === 'active' &&
-        !code.user_id,
+      (code) => code.status === 'active' && !code.user_id,
     ).length,
-
-    recentSales: completedOrders
-      .slice(0, 5)
-      .map((order) => ({
-        id: order.id,
-        status: order.status,
-        total_cents: order.total_cents,
-        quantity: order.quantity ?? 0,
-        created_at: order.created_at,
-        userEmail:
-          profileMap.get(order.user_id ?? '')?.email ??
-          null,
-        productName:
-          productMap.get(order.product_id ?? '')?.name ??
-          null,
-      })),
+    recentSales: completedOrders.slice(0, 5).map((order) => ({
+      id: order.id,
+      status: order.status,
+      total_cents: order.total_cents,
+      quantity: order.quantity ?? 0,
+      created_at: order.created_at,
+      userEmail: profileMap.get(order.user_id ?? '')?.email ?? null,
+      productName: productMap.get(order.product_id ?? '')?.name ?? null,
+    })),
   }
 
-  /*
-   * =========================================================
-   * CLIENTES
-   * =========================================================
-   */
+  const customers = profiles.map((customer) => ({
+    id: customer.id,
+    email: customer.email ?? null,
+    full_name: customer.full_name ?? null,
+    created_at: customer.created_at,
+    codeCount: codes.filter((code) => code.user_id === customer.id).length,
+    orderCount: orders.filter((order) => order.user_id === customer.id).length,
+  }))
 
-  const customers = profiles.map(
-    (customer) => ({
-      id: customer.id,
-      email: customer.email ?? null,
-      full_name: customer.full_name ?? null,
-      created_at: customer.created_at,
+  const adminCodes = codes.map((code) => {
+    const customer = code.user_id ? profileMap.get(code.user_id) : null
+    const product = code.product_id ? productMap.get(code.product_id) : null
 
-      codeCount: codes.filter(
-        (code) =>
-          code.user_id === customer.id,
-      ).length,
+    return {
+      id: code.id,
+      code: code.code,
+      status: code.status,
+      created_at: code.created_at,
+      assigned_at: code.assigned_at ?? null,
+      user_id: code.user_id ?? null,
+      userEmail: customer?.email ?? null,
+      productName: product?.name ?? null,
+      productId: code.product_id ?? null,
+      orderId: code.order_id ?? null,
+    }
+  })
 
-      orderCount: orders.filter(
-        (order) =>
-          order.user_id === customer.id,
-      ).length,
-    }),
-  )
+  const adminOrders = orders.map((order) => {
+    const customer = order.user_id ? profileMap.get(order.user_id) : null
+    const product = order.product_id ? productMap.get(order.product_id) : null
 
-  /*
-   * =========================================================
-   * CÓDIGOS
-   * =========================================================
-   */
-
-  const adminCodes = codes.map(
-    (code) => {
-      const customer = code.user_id
-        ? profileMap.get(code.user_id)
-        : null
-
-      const product = code.product_id
-        ? productMap.get(code.product_id)
-        : null
-
-      return {
+    const orderCodes = codes
+      .filter((code) => code.order_id === order.id)
+      .map((code) => ({
         id: code.id,
         code: code.code,
         status: code.status,
         created_at: code.created_at,
+        assigned_at: code.assigned_at ?? null,
+      }))
 
-        assigned_at:
-          code.assigned_at ?? null,
+    return {
+      id: order.id,
+      status: order.status,
+      total_cents: order.total_cents,
+      quantity: order.quantity ?? orderCodes.length,
+      created_at: order.created_at,
+      userId: order.user_id ?? null,
+      userEmail: customer?.email ?? null,
+      userName: customer?.full_name ?? null,
+      productName: product?.name ?? null,
+      productId: order.product_id ?? null,
+      codes: orderCodes,
+    }
+  })
 
-        user_id:
-          code.user_id ?? null,
-
-        userEmail:
-          customer?.email ?? null,
-
-        productName:
-          product?.name ?? null,
-
-        productId:
-          code.product_id ?? null,
-
-        orderId:
-          code.order_id ?? null,
-      }
-    },
-  )
-
-  /*
-   * =========================================================
-   * PEDIDOS
-   *
-   * Cada pedido recebe também os códigos vinculados
-   * através de activation_codes.order_id.
-   * =========================================================
-   */
-
-  const adminOrders = orders.map(
-    (order) => {
-      const customer = order.user_id
-        ? profileMap.get(order.user_id)
-        : null
-
-      const product = order.product_id
-        ? productMap.get(order.product_id)
-        : null
-
-      const orderCodes = codes
-        .filter(
-          (code) =>
-            code.order_id === order.id,
-        )
-        .map((code) => ({
-          id: code.id,
-          code: code.code,
-          status: code.status,
-          created_at: code.created_at,
-          assigned_at:
-            code.assigned_at ?? null,
-        }))
-
-      return {
-        id: order.id,
-        status: order.status,
-        total_cents: order.total_cents,
-
-        quantity:
-          order.quantity ?? orderCodes.length,
-
-        created_at: order.created_at,
-
-        userId:
-          order.user_id ?? null,
-
-        userEmail:
-          customer?.email ?? null,
-
-        userName:
-          customer?.full_name ?? null,
-
-        productName:
-          product?.name ?? null,
-
-        productId:
-          order.product_id ?? null,
-
-        codes: orderCodes,
-      }
-    },
-  )
-
-  /*
-   * =========================================================
-   * OPÇÕES DE PRODUTOS
-   * =========================================================
-   */
-
-  const productOptions = products.map(
-    (product) => ({
-      id: product.id,
-      name: product.name,
-    }),
-  )
-
-  /*
-   * =========================================================
-   * OPÇÕES DE CLIENTES
-   * =========================================================
-   */
+  const productOptions = products.map((product) => ({
+    id: product.id,
+    name: product.name,
+  }))
 
   const customerOptions = profiles
     .filter(
       (customer) =>
-        customer.id !== user.id ||
-        customer.email ||
-        customer.full_name,
+        customer.id !== user.id || customer.email || customer.full_name,
     )
     .map((customer) => ({
       id: customer.id,
-
-      label:
-        customer.email ??
-        customer.full_name ??
-        customer.id,
+      label: customer.email ?? customer.full_name ?? customer.id,
     }))
-
-  const auditActionLabels: Record<string, string> = {
-    create_codes: 'Códigos adicionados',
-    assign_code: 'Código atribuído',
-    unassign_code: 'Código removido do cliente',
-    set_code_status: 'Status de código alterado',
-    sync_used_codes: 'Sincronização de códigos usados',
-    delete_code: 'Código excluído',
-    set_order_status: 'Status de pedido alterado',
-  }
-
-  const auditEntityLabels: Record<string, string> = {
-    activation_code: 'Código',
-    order: 'Pedido',
-    profile: 'Cliente',
-  }
-
-  /*
-   * =========================================================
-   * PAINEL
-   * =========================================================
-   */
 
   return (
     <div className="min-h-dvh bg-background">
-
       <DashboardNavbar
         user={{
-          email:
-            user.email ??
-            profile.email ??
-            null,
+          email: user.email ?? profile.email ?? null,
         }}
       />
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-
         <div className="mb-8">
-
           <h1 className="text-2xl font-bold tracking-tight">
             Painel Administrativo
           </h1>
-
           <p className="mt-1 text-sm text-muted-foreground">
             Gerencie clientes, códigos, estoque e pedidos.
           </p>
-
         </div>
-
-        {/* ===================================================
-            DASHBOARD DE VENDAS
-        ==================================================== */
 
         <section className="mb-8">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">
-                Resumo de vendas
-              </h2>
+              <h2 className="text-lg font-semibold">Resumo de vendas</h2>
               <p className="text-sm text-muted-foreground">
                 Visão geral baseada nos pedidos e códigos atuais.
               </p>
@@ -468,29 +239,25 @@ export default async function AdminPage() {
 
             <div className="rounded-xl border border-border/60 bg-card p-5">
               <p className="text-sm text-muted-foreground">Pedidos</p>
-              <p className="mt-2 text-2xl font-bold">
-                {salesSummary.orders}
-              </p>
+              <p className="mt-2 text-2xl font-bold">{salesSummary.orders}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Total registrados
               </p>
             </div>
 
             <div className="rounded-xl border border-border/60 bg-card p-5">
-              <p className="text-sm text-muted-foreground">Pagos concluídos</p>
+              <p className="text-sm text-muted-foreground">Pagamentos concluídos</p>
               <p className="mt-2 text-2xl font-bold text-emerald-500">
                 {salesSummary.completedOrders}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Pagos ou entregas confirmadas
+                Pagamentos ou entregas confirmadas
               </p>
             </div>
 
             <div className="rounded-xl border border-border/60 bg-card p-5">
               <p className="text-sm text-muted-foreground">Códigos vendidos</p>
-              <p className="mt-2 text-2xl font-bold">
-                {salesSummary.codesSold}
-              </p>
+              <p className="mt-2 text-2xl font-bold">{salesSummary.codesSold}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Quantidade dos pedidos concluídos
               </p>
@@ -553,51 +320,6 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        {/* ===================================================
-            HISTÓRICO / AUDITORIA
-        ==================================================== */}
-
-        <section className="mb-8 rounded-xl border border-border/60 bg-card">
-          <div className="border-b border-border/60 px-5 py-4">
-            <h2 className="text-lg font-semibold">
-              Histórico administrativo
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Últimas 50 ações realizadas no painel.
-            </p>
-          </div>
-
-          {auditLogs.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-muted-foreground">
-              Nenhuma ação administrativa registrada ainda.
-            </div>
-          ) : (
-            <div className="divide-y">
-              {auditLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {auditActionLabels[log.action] ?? log.action}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {log.description}
-                      {' • '}
-                      {auditEntityLabels[log.entity_type] ?? log.entity_type}
-                    </p>
-                  </div>
-
-                  <div className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(log.created_at).toLocaleString('pt-BR')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <AdminDashboard
           customers={customers}
           codes={adminCodes}
@@ -605,9 +327,7 @@ export default async function AdminPage() {
           productOptions={productOptions}
           customerOptions={customerOptions}
         />
-
       </main>
-
     </div>
   )
 }
