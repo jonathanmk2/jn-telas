@@ -8,16 +8,6 @@ type OrderRequest = {
   quantity?: unknown
 }
 
-function normalizePlanQuantity(value: unknown) {
-  const plan = String(value ?? '').trim().toLowerCase()
-
-  if (plan === 'plano-1-tela' || plan === 'plano-1-telas') return 1
-  if (plan === 'plano-5-telas') return 5
-  if (plan === 'plano-10-telas') return 10
-
-  return null
-}
-
 function getBackendUnitPrice(quantity: number) {
   if (quantity >= 10) return 3300
   if (quantity >= 5) return 3400
@@ -59,28 +49,20 @@ export async function POST(request: Request) {
     )
   }
 
-  const quantity = normalizePlanQuantity(body.productId)
-
-  if (!quantity) {
-    return NextResponse.json(
-      { ok: false, error: 'Plano inválido.' },
-      { status: 400 },
-    )
-  }
-
   const requestedQuantity = Number(body.quantity)
 
   if (
     !Number.isInteger(requestedQuantity) ||
     requestedQuantity < 1 ||
-    requestedQuantity > 50 ||
-    requestedQuantity !== quantity
+    requestedQuantity > 500
   ) {
     return NextResponse.json(
-      { ok: false, error: 'Quantidade inválida para este plano.' },
+      { ok: false, error: 'Quantidade inválida. Escolha entre 1 e 500 telas.' },
       { status: 400 },
     )
   }
+
+  const quantity = requestedQuantity
 
   const { data: rateLimitOk, error: rateLimitError } = await admin.rpc(
     'check_order_rate_limit',
@@ -293,6 +275,7 @@ export async function POST(request: Request) {
     type: 'online',
     total_amount: (totalCents / 100).toFixed(2),
     external_reference: externalReference,
+    processing_mode: 'automatic',
     description: quantity === 1 ? '1 Tela JN TELAS' : `${quantity} Telas JN TELAS`,
     transactions: {
       payments: [
@@ -304,6 +287,9 @@ export async function POST(request: Request) {
           },
         },
       ],
+    },
+    payer: {
+      email: user.email,
     },
   }
 
@@ -334,8 +320,9 @@ export async function POST(request: Request) {
 
   const mercadoPagoOrder = await mercadoPagoResponse.json()
   const mercadoPagoOrderId = mercadoPagoOrder?.id ?? null
-  const qrCode = mercadoPagoOrder?.transactions?.payments?.[0]?.payment_method?.qr_code ?? null
-  const qrCodeBase64 = mercadoPagoOrder?.transactions?.payments?.[0]?.payment_method?.qr_code_base64 ?? null
+  const paymentMethod = mercadoPagoOrder?.transactions?.payments?.[0]?.payment_method ?? null
+  const qrCode = paymentMethod?.qr_code ?? null
+  const qrCodeBase64 = paymentMethod?.qr_code_base64 ?? null
 
   if (!mercadoPagoOrderId || !qrCode) {
     console.error('Mercado Pago retornou pedido sem QR Code:', mercadoPagoOrder)
