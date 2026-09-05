@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createAdminAuditLog } from '@/lib/admin-audit'
 
 type ActionResult =
   | {
@@ -223,6 +224,17 @@ export async function createCodes(
     }
   }
 
+  await createAdminAuditLog({
+    adminId,
+    action: 'create_codes',
+    entityType: 'activation_code',
+    description: `${rows.length} código(s) adicionado(s) ao estoque.`,
+    metadata: {
+      quantity: rows.length,
+      codes: rows.map((row) => row.code),
+    },
+  })
+
   revalidatePath('/admin')
 
   return {
@@ -280,6 +292,19 @@ export async function assignCode(
         `Erro Supabase: ${error.message}`,
     }
   }
+
+  await createAdminAuditLog({
+    adminId,
+    action: userId ? 'assign_code' : 'unassign_code',
+    entityType: 'activation_code',
+    entityId: codeId,
+    description: userId
+      ? 'Código atribuído a um cliente.'
+      : 'Código removido do cliente.',
+    metadata: {
+      userId,
+    },
+  })
 
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
@@ -350,6 +375,17 @@ export async function setCodeStatus(
         `Erro Supabase: ${error.message}`,
     }
   }
+
+  await createAdminAuditLog({
+    adminId,
+    action: 'set_code_status',
+    entityType: 'activation_code',
+    entityId: codeId,
+    description: `Status do código alterado para ${status}.`,
+    metadata: {
+      status,
+    },
+  })
 
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
@@ -518,6 +554,19 @@ export async function syncUsedCodes(
    */
   const found = existing.length
 
+  await createAdminAuditLog({
+    adminId,
+    action: 'sync_used_codes',
+    entityType: 'activation_code',
+    description: `${updated} código(s) marcado(s) como usado(s) por sincronização.`,
+    metadata: {
+      requested: codes.length,
+      found,
+      updated,
+      notFound,
+    },
+  })
+
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
 
@@ -570,6 +619,14 @@ export async function deleteCode(
         `Erro Supabase: ${error.message}`,
     }
   }
+
+  await createAdminAuditLog({
+    adminId,
+    action: 'delete_code',
+    entityType: 'activation_code',
+    entityId: codeId,
+    description: 'Código excluído do estoque.',
+  })
 
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
@@ -639,6 +696,17 @@ export async function setOrderStatus(
         `Erro Supabase: ${error.message}`,
     }
   }
+
+  await createAdminAuditLog({
+    adminId,
+    action: 'set_order_status',
+    entityType: 'order',
+    entityId: orderId,
+    description: `Status do pedido alterado para ${status}.`,
+    metadata: {
+      status,
+    },
+  })
 
   revalidatePath('/admin')
   revalidatePath('/minha-conta')
