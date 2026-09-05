@@ -149,6 +149,62 @@ export default async function AdminPage() {
 
   /*
    * =========================================================
+   * RESUMO DE VENDAS
+   * =========================================================
+   * Consideramos faturamento e códigos vendidos apenas dos
+   * pedidos pagos ou entregues. Pedidos pendentes/cancelados
+   * não entram no faturamento.
+   * =========================================================
+   */
+
+  const completedOrders = orders.filter(
+    (order) =>
+      order.status === 'paid' ||
+      order.status === 'delivered',
+  )
+
+  const salesSummary = {
+    revenueCents: completedOrders.reduce(
+      (total, order) =>
+        total + (order.total_cents ?? 0),
+      0,
+    ),
+
+    orders: orders.length,
+
+    completedOrders: completedOrders.length,
+
+    codesSold: completedOrders.reduce(
+      (total, order) =>
+        total + (order.quantity ?? 0),
+      0,
+    ),
+
+    availableStock: codes.filter(
+      (code) =>
+        code.status === 'active' &&
+        !code.user_id,
+    ).length,
+
+    recentSales: completedOrders
+      .slice(0, 5)
+      .map((order) => ({
+        id: order.id,
+        status: order.status,
+        total_cents: order.total_cents,
+        quantity: order.quantity ?? 0,
+        created_at: order.created_at,
+        userEmail:
+          profileMap.get(order.user_id ?? '')?.email ??
+          null,
+        productName:
+          productMap.get(order.product_id ?? '')?.name ??
+          null,
+      })),
+  }
+
+  /*
+   * =========================================================
    * CLIENTES
    * =========================================================
    */
@@ -344,6 +400,123 @@ export default async function AdminPage() {
           </p>
 
         </div>
+
+        {/* ===================================================
+            DASHBOARD DE VENDAS
+        ==================================================== */}
+
+        <section className="mb-8">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Resumo de vendas
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Visão geral baseada nos pedidos e códigos atuais.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-xl border border-border/60 bg-card p-5">
+              <p className="text-sm text-muted-foreground">Faturamento</p>
+              <p className="mt-2 text-2xl font-bold">
+                R$ {(salesSummary.revenueCents / 100).toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pedidos pagos/entregues
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-5">
+              <p className="text-sm text-muted-foreground">Pedidos</p>
+              <p className="mt-2 text-2xl font-bold">
+                {salesSummary.orders}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Total registrados
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-5">
+              <p className="text-sm text-muted-foreground">Pagos concluídos</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-500">
+                {salesSummary.completedOrders}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pagos ou entregas confirmadas
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-5">
+              <p className="text-sm text-muted-foreground">Códigos vendidos</p>
+              <p className="mt-2 text-2xl font-bold">
+                {salesSummary.codesSold}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Quantidade dos pedidos concluídos
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-5">
+              <p className="text-sm text-muted-foreground">Estoque disponível</p>
+              <p className="mt-2 text-2xl font-bold text-primary">
+                {salesSummary.availableStock}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Códigos ativos sem cliente
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-border/60 bg-card">
+            <div className="border-b border-border/60 px-5 py-4">
+              <h3 className="font-semibold">Vendas recentes</h3>
+            </div>
+
+            {salesSummary.recentSales.length === 0 ? (
+              <div className="px-5 py-6 text-sm text-muted-foreground">
+                Nenhuma venda concluída registrada.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {salesSummary.recentSales.map((sale) => (
+                  <div
+                    key={sale.id}
+                    className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {sale.userEmail ?? 'Cliente não identificado'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sale.quantity} código(s)
+                        {sale.productName ? ` • ${sale.productName}` : ''}
+                        {' • '}
+                        {new Date(sale.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-600">
+                        {sale.status === 'delivered' ? 'ENTREGUE' : 'PAGO'}
+                      </span>
+                      <span className="text-sm font-bold">
+                        R$ {(sale.total_cents / 100).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
         <AdminDashboard
           customers={customers}
