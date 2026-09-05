@@ -20,7 +20,7 @@ export default async function HomePage() {
   )
 
   let user: { email?: string | null } | null = null
-
+  let isAdmin = false
   let products: Product[] = []
 
   if (hasSupabase) {
