@@ -44,7 +44,6 @@ export function PendingPayment() {
         if (!nextOrder) {
           setOrder(null)
           setPayment(null)
-          setPaymentState((current) => current === 'confirmed' ? current : null)
           return
         }
 
@@ -72,17 +71,14 @@ export function PendingPayment() {
 
     async function checkPayment() {
       try {
-        const response = await fetch(
-          `/api/payment-status?orderId=${order.orderId}`,
-          { cache: 'no-store' },
-        )
-
+        const response = await fetch(`/api/payment-status?orderId=${order.orderId}`, { cache: 'no-store' })
         if (!active) return
 
         if (response.status === 410 || response.status === 404) {
           setOrder(null)
           setPayment(null)
           setPaymentState('cancelled')
+          router.refresh()
           return
         }
 
@@ -92,16 +88,18 @@ export function PendingPayment() {
         if (!active) return
 
         if (data.status === 'paid' || data.status === 'delivered') {
+          // Primeiro atualiza os dados server-side da Minha Conta.
+          router.refresh()
+          // Mantém a confirmação visível enquanto a página é atualizada.
           setPaymentState('confirmed')
           setPayment(null)
           toast.success('Pagamento confirmado com sucesso!')
-          router.refresh()
         } else if (data.status === 'cancelled') {
+          router.refresh()
           setPaymentState('cancelled')
           setPayment(null)
           setOrder(null)
           toast.error('Este pagamento foi cancelado.')
-          router.refresh()
         }
       } catch {
         // Uma falha momentânea não interrompe a verificação.
@@ -130,6 +128,7 @@ export function PendingPayment() {
         setPaymentState('cancelled')
         setDismissedOrderId(order.orderId)
         toast.error(data.error ?? 'Este pagamento expirou.')
+        router.refresh()
         return
       }
 
@@ -191,21 +190,14 @@ export function PendingPayment() {
   if (paymentState === 'confirmed') {
     return (
       <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/30 bg-background p-4 shadow-2xl">
-        <button
-          type="button"
-          onClick={() => setPaymentState(null)}
-          className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-          aria-label="Fechar confirmação"
-        >
+        <button type="button" onClick={() => setPaymentState(null)} className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Fechar confirmação">
           <X className="size-4" />
         </button>
         <div className="flex items-center gap-3 pr-6">
           <CheckCircle2 className="size-9 shrink-0 text-emerald-500" />
           <div>
             <p className="text-sm font-bold">Pagamento confirmado!</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.</p>
           </div>
         </div>
       </div>
@@ -222,51 +214,25 @@ export function PendingPayment() {
 
   return (
     <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-primary/30 bg-background p-4 shadow-2xl">
-      <button
-        type="button"
-        onClick={dismissPendingPayment}
-        className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-        aria-label="Fechar aviso"
-      >
+      <button type="button" onClick={dismissPendingPayment} className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Fechar aviso">
         <X className="size-4" />
       </button>
 
       {payment ? (
         <div className="pt-1 text-center">
           <h3 className="text-lg font-bold">Continuar pagamento PIX</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {order.quantity} {order.quantity === 1 ? 'tela' : 'telas'} · {formatBRL(order.totalCents)}
-          </p>
-          {qrImage && (
-            <div className="mt-4 flex justify-center">
-              <div className="rounded-xl bg-white p-3">
-                <img src={qrImage} alt="QR Code PIX" className="h-52 w-52" />
-              </div>
-            </div>
-          )}
-          <Button className="mt-3 w-full" onClick={copyPix} disabled={!payment.qrCode}>
-            <Copy className="size-4" />
-            Copiar código PIX
-          </Button>
-          <Button className="mt-2 w-full" variant="outline" onClick={() => setPayment(null)}>
-            Voltar
-          </Button>
+          <p className="mt-1 text-sm text-muted-foreground">{order.quantity} {order.quantity === 1 ? 'tela' : 'telas'} · {formatBRL(order.totalCents)}</p>
+          {qrImage && <div className="mt-4 flex justify-center"><div className="rounded-xl bg-white p-3"><img src={qrImage} alt="QR Code PIX" className="h-52 w-52" /></div></div>}
+          <Button className="mt-3 w-full" onClick={copyPix} disabled={!payment.qrCode}><Copy className="size-4" />Copiar código PIX</Button>
+          <Button className="mt-2 w-full" variant="outline" onClick={() => setPayment(null)}>Voltar</Button>
         </div>
       ) : (
         <div className="pr-6">
           <p className="text-sm font-bold">Você tem um pagamento pendente</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {order.quantity} {order.quantity === 1 ? 'tela' : 'telas'} · {formatBRL(order.totalCents)}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{order.quantity} {order.quantity === 1 ? 'tela' : 'telas'} · {formatBRL(order.totalCents)}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button onClick={resumePayment} disabled={loading || cancelling}>
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              Continuar PIX
-            </Button>
-            <Button variant="outline" onClick={cancelPayment} disabled={loading || cancelling}>
-              {cancelling ? <Loader2 className="size-4 animate-spin" /> : null}
-              Cancelar pagamento
-            </Button>
+            <Button onClick={resumePayment} disabled={loading || cancelling}>{loading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}Continuar PIX</Button>
+            <Button variant="outline" onClick={cancelPayment} disabled={loading || cancelling}>{cancelling ? <Loader2 className="size-4 animate-spin" /> : null}Cancelar pagamento</Button>
           </div>
         </div>
       )}
