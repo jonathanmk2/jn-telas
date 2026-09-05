@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const ORDER_EXPIRATION_MINUTES = 30
+
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Você não pode consultar este pedido.' }, { status: 403 })
     }
 
-    if (order.status === 'pending' && Date.now() >= new Date(order.created_at).getTime() + 10 * 60 * 1000) {
+    if (order.status === 'pending' && Date.now() >= new Date(order.created_at).getTime() + ORDER_EXPIRATION_MINUTES * 60 * 1000) {
       await admin.rpc('cancel_pending_order', {
         p_order_id: order.id,
         p_user_id: user.id,
