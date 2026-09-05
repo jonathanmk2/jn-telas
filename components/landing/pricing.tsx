@@ -69,6 +69,7 @@ export function Pricing({
   const [quantityInput, setQuantityInput] = useState('1')
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null)
   const [stockMessage, setStockMessage] = useState<string | null>(null)
+  const [pendingPaymentMessage, setPendingPaymentMessage] = useState<string | null>(null)
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const product =
@@ -87,6 +88,7 @@ export function Pricing({
     idempotencyKeyRef.current = null
     setRateLimitMessage(null)
     setStockMessage(null)
+    setPendingPaymentMessage(null)
   }
 
   function handleBuy() {
@@ -102,6 +104,7 @@ export function Pricing({
 
     setRateLimitMessage(null)
     setStockMessage(null)
+    setPendingPaymentMessage(null)
 
     if (!isValidQuantityInput(quantityInput)) {
       toast.error('Quantidade inválida. Digite um número inteiro entre 1 e 500.')
@@ -160,6 +163,7 @@ export function Pricing({
           idempotencyKeyRef.current = null
           setRateLimitMessage(null)
           setStockMessage(null)
+          setPendingPaymentMessage(null)
           toast.success(
             res.idempotent
               ? 'Pedido recuperado com sucesso!'
@@ -176,6 +180,14 @@ export function Pricing({
         const errorMessage = res.error ?? 'Não foi possível criar o pedido.'
         const isStockError = /estoque|c[oó]digos? dispon[ií]veis|insuficiente/i.test(errorMessage)
 
+        if (response.status === 409 && res.duplicatePending) {
+          const message = 'Você já possui um pagamento pendente. Finalize ou cancele esse pagamento antes de realizar uma nova compra.'
+          setPendingPaymentMessage(message)
+          idempotencyKeyRef.current = null
+          toast.error(message)
+          return
+        }
+
         if (isStockError) {
           setStockMessage(errorMessage)
           idempotencyKeyRef.current = null
@@ -183,9 +195,8 @@ export function Pricing({
         }
 
         if (response.status === 409) {
-          toast.error(
-            errorMessage,
-          )
+          toast.error(errorMessage)
+          idempotencyKeyRef.current = null
           return
         }
 
@@ -319,6 +330,7 @@ export function Pricing({
                         idempotencyKeyRef.current = null
                         setRateLimitMessage(null)
                         setStockMessage(null)
+                        setPendingPaymentMessage(null)
                       }
                     }}
                     className={`h-8 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`}
@@ -396,6 +408,21 @@ export function Pricing({
                   </>
                 )}
               </Button>
+
+              {pendingPaymentMessage && (
+                <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center">
+                  <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Pagamento pendente</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{pendingPaymentMessage}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 h-9 w-full text-xs"
+                    onClick={() => router.push('/minha-conta')}
+                  >
+                    Ver pagamento pendente
+                  </Button>
+                </div>
+              )}
 
               {rateLimitMessage && (
                 <div role="alert" className="mt-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-center">
