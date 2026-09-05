@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const ORDER_EXPIRATION_MINUTES = 30
+
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
     .select('id, user_id')
     .eq('status', 'pending')
     .is('payment_id', null)
-    .lte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+    .lte('created_at', new Date(Date.now() - ORDER_EXPIRATION_MINUTES * 60 * 1000).toISOString())
     .limit(100)
 
   if (findError) {
