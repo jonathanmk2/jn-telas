@@ -22,6 +22,7 @@ export function PendingPayment() {
   const [paymentState, setPaymentState] = useState<PaymentState>(null)
   const [loading, setLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [dismissedOrderId, setDismissedOrderId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -35,14 +36,17 @@ export function PendingPayment() {
 
         const nextOrder = data.pending ?? null
 
-        if (nextOrder) {
-          setOrder(nextOrder)
-          setPaymentState('pending')
-        } else {
-          setOrder((currentOrder) => currentOrder)
-          setPayment((currentPayment) => currentPayment)
-          setPaymentState((currentState) => currentState === 'confirmed' ? currentState : null)
+        if (!nextOrder) {
+          setOrder(null)
+          setPayment(null)
+          setPaymentState((current) => current === 'confirmed' ? current : null)
+          return
         }
+
+        if (nextOrder.orderId === dismissedOrderId) return
+
+        setOrder(nextOrder)
+        setPaymentState('pending')
       } catch {
         // O aviso não deve impedir a navegação do cliente.
       }
@@ -54,7 +58,7 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [])
+  }, [dismissedOrderId])
 
   useEffect(() => {
     if (!order?.orderId || paymentState !== 'pending') return
@@ -89,6 +93,7 @@ export function PendingPayment() {
         } else if (data.status === 'cancelled') {
           setPaymentState('cancelled')
           setPayment(null)
+          setOrder(null)
           toast.error('Este pagamento foi cancelado.')
         }
       } catch {
@@ -116,6 +121,7 @@ export function PendingPayment() {
         setOrder(null)
         setPayment(null)
         setPaymentState('cancelled')
+        setDismissedOrderId(order.orderId)
         toast.error(data.error ?? 'Este pagamento expirou.')
         return
       }
@@ -132,9 +138,10 @@ export function PendingPayment() {
   async function cancelPayment() {
     if (!order) return
     setCancelling(true)
+    const orderId = order.orderId
 
     try {
-      const response = await fetch(`/api/orders/${order.orderId}/cancel`, { method: 'POST' })
+      const response = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
       const data = await response.json()
 
       if (!response.ok) {
@@ -145,12 +152,20 @@ export function PendingPayment() {
       setPayment(null)
       setOrder(null)
       setPaymentState('cancelled')
+      setDismissedOrderId(orderId)
       toast.success('Pagamento cancelado. O estoque foi liberado.')
     } catch {
       toast.error('Não foi possível cancelar o pagamento.')
     } finally {
       setCancelling(false)
     }
+  }
+
+  function dismissPendingPayment() {
+    if (order?.orderId) setDismissedOrderId(order.orderId)
+    setPayment(null)
+    setOrder(null)
+    setPaymentState(null)
   }
 
   async function copyPix() {
@@ -199,7 +214,7 @@ export function PendingPayment() {
     <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-primary/30 bg-background p-4 shadow-2xl">
       <button
         type="button"
-        onClick={() => setOrder(null)}
+        onClick={dismissPendingPayment}
         className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
         aria-label="Fechar aviso"
       >
