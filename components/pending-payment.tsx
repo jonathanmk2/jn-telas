@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { CheckCircle2, Copy, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
@@ -17,6 +18,7 @@ type PendingOrder = {
 type PaymentState = 'pending' | 'confirmed' | 'cancelled' | null
 
 export function PendingPayment() {
+  const pathname = usePathname()
   const [order, setOrder] = useState<PendingOrder | null>(null)
   const [payment, setPayment] = useState<{ qrCode: string | null; qrCodeBase64: string | null } | null>(null)
   const [paymentState, setPaymentState] = useState<PaymentState>(null)
@@ -25,6 +27,8 @@ export function PendingPayment() {
   const [dismissedOrderId, setDismissedOrderId] = useState<string | null>(null)
 
   useEffect(() => {
+    if (pathname !== '/minha-conta') return
+
     let active = true
 
     async function load() {
@@ -58,10 +62,10 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [dismissedOrderId])
+  }, [pathname, dismissedOrderId])
 
   useEffect(() => {
-    if (!order?.orderId || paymentState !== 'pending') return
+    if (pathname !== '/minha-conta' || !order?.orderId || paymentState !== 'pending') return
 
     let active = true
 
@@ -107,7 +111,7 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [order?.orderId, paymentState])
+  }, [pathname, order?.orderId, paymentState])
 
   async function resumePayment() {
     if (!order) return
@@ -177,6 +181,8 @@ export function PendingPayment() {
       toast.error('Não foi possível copiar o código PIX.')
     }
   }
+
+  if (pathname !== '/minha-conta') return null
 
   if (paymentState === 'confirmed') {
     return (
