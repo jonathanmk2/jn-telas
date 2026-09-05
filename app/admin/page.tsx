@@ -58,6 +58,7 @@ export default async function AdminPage() {
     codesResult,
     ordersResult,
     productsResult,
+    auditLogsResult,
   ] = await Promise.all([
     admin
       .from('profiles')
@@ -92,6 +93,16 @@ export default async function AdminPage() {
       .order('name', {
         ascending: true,
       }),
+
+    admin
+      .from('admin_audit_logs')
+      .select(
+        'id, admin_id, action, entity_type, entity_id, description, metadata, created_at',
+      )
+      .order('created_at', {
+        ascending: false,
+      })
+      .limit(50),
   ])
 
   if (profilesResult.error) {
@@ -122,10 +133,18 @@ export default async function AdminPage() {
     )
   }
 
+  if (auditLogsResult.error) {
+    console.error(
+      'Erro ao carregar histórico administrativo:',
+      auditLogsResult.error,
+    )
+  }
+
   const profiles = profilesResult.data ?? []
   const codes = codesResult.data ?? []
   const orders = ordersResult.data ?? []
   const products = productsResult.data ?? []
+  const auditLogs = auditLogsResult.data ?? []
 
   /*
    * =========================================================
@@ -369,6 +388,22 @@ export default async function AdminPage() {
         customer.id,
     }))
 
+  const auditActionLabels: Record<string, string> = {
+    create_codes: 'Códigos adicionados',
+    assign_code: 'Código atribuído',
+    unassign_code: 'Código removido do cliente',
+    set_code_status: 'Status de código alterado',
+    sync_used_codes: 'Sincronização de códigos usados',
+    delete_code: 'Código excluído',
+    set_order_status: 'Status de pedido alterado',
+  }
+
+  const auditEntityLabels: Record<string, string> = {
+    activation_code: 'Código',
+    order: 'Pedido',
+    profile: 'Cliente',
+  }
+
   /*
    * =========================================================
    * PAINEL
@@ -403,7 +438,7 @@ export default async function AdminPage() {
 
         {/* ===================================================
             DASHBOARD DE VENDAS
-        ==================================================== */}
+        ==================================================== */
 
         <section className="mb-8">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -516,6 +551,51 @@ export default async function AdminPage() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* ===================================================
+            HISTÓRICO / AUDITORIA
+        ==================================================== */}
+
+        <section className="mb-8 rounded-xl border border-border/60 bg-card">
+          <div className="border-b border-border/60 px-5 py-4">
+            <h2 className="text-lg font-semibold">
+              Histórico administrativo
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Últimas 50 ações realizadas no painel.
+            </p>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <div className="px-5 py-6 text-sm text-muted-foreground">
+              Nenhuma ação administrativa registrada ainda.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {auditLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {auditActionLabels[log.action] ?? log.action}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {log.description}
+                      {' • '}
+                      {auditEntityLabels[log.entity_type] ?? log.entity_type}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 text-xs text-muted-foreground">
+                    {new Date(log.created_at).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <AdminDashboard
