@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 
 import { DashboardNavbar } from '@/components/dashboard/dashboard-navbar'
 import { AdminDashboard } from '@/components/admin/admin-dashboard'
+import { AdminAuditLog } from '@/components/admin/admin-audit-log'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -42,6 +43,7 @@ export default async function AdminPage() {
     codesResult,
     ordersResult,
     productsResult,
+    auditLogsResult,
   ] = await Promise.all([
     admin
       .from('profiles')
@@ -62,6 +64,12 @@ export default async function AdminPage() {
       .from('products')
       .select('id, name')
       .order('name', { ascending: true }),
+
+    admin
+      .from('admin_audit_logs')
+      .select('id, action, entity_type, entity_id, description, metadata, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   if (profilesResult.error) {
@@ -80,10 +88,15 @@ export default async function AdminPage() {
     console.error('Erro ao carregar produtos:', productsResult.error)
   }
 
+  if (auditLogsResult.error) {
+    console.error('Erro ao carregar histórico administrativo:', auditLogsResult.error)
+  }
+
   const profiles = profilesResult.data ?? []
   const codes = codesResult.data ?? []
   const orders = ordersResult.data ?? []
   const products = productsResult.data ?? []
+  const auditLogs = auditLogsResult.data ?? []
 
   const profileMap = new Map(
     profiles.map((profile) => [profile.id, profile]),
@@ -319,6 +332,8 @@ export default async function AdminPage() {
             )}
           </div>
         </section>
+
+        <AdminAuditLog logs={auditLogs} />
 
         <AdminDashboard
           customers={customers}
