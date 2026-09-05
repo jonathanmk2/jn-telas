@@ -9,14 +9,8 @@ type OrderRequest = {
 }
 
 function getUnitPriceCents(quantity: number): number {
-  if (quantity >= 10) {
-    return 3300
-  }
-
-  if (quantity >= 5) {
-    return 3400
-  }
-
+  if (quantity >= 10) return 3300
+  if (quantity >= 5) return 3400
   return 3500
 }
 
@@ -32,31 +26,17 @@ function isValidQuantity(quantity: unknown): quantity is number {
 
 function getClientIp(request: Request): string | null {
   const forwardedFor = request.headers.get('x-forwarded-for')
-
   if (forwardedFor) {
     const firstIp = forwardedFor.split(',')[0]?.trim()
-
-    if (firstIp) {
-      return firstIp
-    }
+    if (firstIp) return firstIp
   }
 
-  const realIp = request.headers.get('x-real-ip')?.trim()
-
-  return realIp || null
+  return request.headers.get('x-real-ip')?.trim() || null
 }
 
 function getIdempotencyKey(request: Request): string | null {
   const value = request.headers.get('Idempotency-Key')?.trim()
-
-  if (!value) {
-    return null
-  }
-
-  if (value.length > 255) {
-    return null
-  }
-
+  if (!value || value.length > 255) return null
   return value
 }
 
@@ -67,40 +47,27 @@ function extractPaymentData(mercadoPagoOrder: any) {
     mercadoPagoOrder?.payments?.[0] ??
     null
 
-  const qrCode =
-    transaction?.payment_method?.qr_code ??
-    transaction?.qr_code ??
-    transaction?.point_of_interaction?.transaction_data
-      ?.qr_code ??
-    mercadoPagoOrder?.qr_code ??
-    mercadoPagoOrder?.point_of_interaction?.transaction_data
-      ?.qr_code ??
-    null
-
-  const qrCodeBase64 =
-    transaction?.payment_method?.qr_code_base64 ??
-    transaction?.qr_code_base64 ??
-    transaction?.point_of_interaction?.transaction_data
-      ?.qr_code_base64 ??
-    mercadoPagoOrder?.qr_code_base64 ??
-    mercadoPagoOrder?.point_of_interaction?.transaction_data
-      ?.qr_code_base64 ??
-    null
-
   return {
-    qrCode,
-    qrCodeBase64,
+    qrCode:
+      transaction?.payment_method?.qr_code ??
+      transaction?.qr_code ??
+      transaction?.point_of_interaction?.transaction_data?.qr_code ??
+      mercadoPagoOrder?.qr_code ??
+      mercadoPagoOrder?.point_of_interaction?.transaction_data?.qr_code ??
+      null,
+    qrCodeBase64:
+      transaction?.payment_method?.qr_code_base64 ??
+      transaction?.qr_code_base64 ??
+      transaction?.point_of_interaction?.transaction_data?.qr_code_base64 ??
+      mercadoPagoOrder?.qr_code_base64 ??
+      mercadoPagoOrder?.point_of_interaction?.transaction_data?.qr_code_base64 ??
+      null,
   }
 }
 
-async function getMercadoPagoOrder(
-  token: string,
-  mercadoPagoOrderId: string,
-) {
+async function getMercadoPagoOrder(token: string, orderId: string) {
   const response = await fetch(
-    `https://api.mercadopago.com/v1/orders/${encodeURIComponent(
-      mercadoPagoOrderId,
-    )}`,
+    `https://api.mercadopago.com/v1/orders/${encodeURIComponent(orderId)}`,
     {
       method: 'GET',
       headers: {
@@ -112,43 +79,29 @@ async function getMercadoPagoOrder(
   )
 
   const text = await response.text()
-
   if (!response.ok) {
-    throw new Error(
-      `Mercado Pago erro ${response.status}: ${text}`,
-    )
+    throw new Error(`Mercado Pago erro ${response.status}: ${text}`)
   }
 
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error(
-      'O Mercado Pago retornou uma resposta inválida.',
-    )
+    throw new Error('O Mercado Pago retornou uma resposta inválida.')
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const mercadoPagoToken =
-      process.env.MERCADO_PAGO_ACCESS_TOKEN
-
+    const mercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
     if (!mercadoPagoToken) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Mercado Pago não configurado no servidor.',
-        },
+        { ok: false, error: 'Mercado Pago não configurado no servidor.' },
         { status: 500 },
       )
     }
 
-    const mercadoPagoIntegratorId =
-      process.env.MERCADO_PAGO_INTEGRATOR_ID
-
+    const mercadoPagoIntegratorId = process.env.MERCADO_PAGO_INTEGRATOR_ID
     const supabase = await createClient()
-
     const {
       data: { user },
       error: userError,
@@ -156,11 +109,7 @@ export async function POST(request: Request) {
 
     if (userError) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            `Erro ao verificar autenticação: ${userError.message}`,
-        },
+        { ok: false, error: `Erro ao verificar autenticação: ${userError.message}` },
         { status: 401 },
       )
     }
@@ -169,8 +118,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            'Você precisa entrar na sua conta para comprar.',
+          error: 'Você precisa entrar na sua conta para comprar.',
           needsAuth: true,
         },
         { status: 401 },
@@ -178,45 +126,29 @@ export async function POST(request: Request) {
     }
 
     const idempotencyKey = getIdempotencyKey(request)
-
     if (!idempotencyKey) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Idempotency-Key é obrigatória.',
-        },
+        { ok: false, error: 'Idempotency-Key é obrigatória.' },
         { status: 400 },
       )
     }
 
     let body: OrderRequest
-
     try {
       body = await request.json()
     } catch {
       return NextResponse.json(
-        {
-          ok: false,
-          error: 'JSON inválido.',
-        },
+        { ok: false, error: 'JSON inválido.' },
         { status: 400 },
       )
     }
 
-    const productId =
-      typeof body.productId === 'string'
-        ? body.productId
-        : ''
-
+    const productId = typeof body.productId === 'string' ? body.productId : ''
     const quantity = body.quantity
 
     if (!productId) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: 'Produto inválido.',
-        },
+        { ok: false, error: 'Produto inválido.' },
         { status: 400 },
       )
     }
@@ -225,29 +157,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            'Quantidade inválida. Informe um número inteiro entre 1 e 500.',
+          error: 'Quantidade inválida. Informe um número inteiro entre 1 e 500.',
         },
         { status: 400 },
       )
     }
 
     const admin = createAdminClient()
-
-    /*
-     * ==========================================================
-     * PRODUTO
-     * ==========================================================
-     *
-     * O frontend envia um identificador lógico, por exemplo:
-     *
-     * "plano-1-tela"
-     *
-     * O banco, porém, armazena o UUID do produto.
-     *
-     * Por isso precisamos resolver o produto antes da
-     * verificação da Idempotency-Key.
-     */
 
     const plans: Record<string, number> = {
       'plano-1-tela': 1,
@@ -257,96 +173,49 @@ export async function POST(request: Request) {
     }
 
     const screens = plans[productId]
-
     if (!screens) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            `Plano inválido recebido: ${productId}`,
-        },
+        { ok: false, error: `Plano inválido recebido: ${productId}` },
         { status: 400 },
       )
     }
 
-    const {
-      data: product,
-      error: productError,
-    } = await admin
+    const { data: product, error: productError } = await admin
       .from('products')
-      .select(
-        'id, name, screens, price_cents, active',
-      )
+      .select('id, name, screens, price_cents, active')
       .eq('screens', screens)
       .eq('active', true)
       .single()
 
     if (productError) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            `Erro ao buscar o plano: ${productError.message}`,
-        },
+        { ok: false, error: `Erro ao buscar o plano: ${productError.message}` },
         { status: 500 },
       )
     }
 
     if (!product) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: 'Plano não encontrado.',
-        },
+        { ok: false, error: 'Plano não encontrado.' },
         { status: 404 },
       )
     }
 
-    /*
-     * ==========================================================
-     * VERIFICAÇÃO DE IDEMPOTÊNCIA
-     * ==========================================================
-     *
-     * Procuramos:
-     *
-     * usuário + Idempotency-Key
-     *
-     * Se existir, verificamos produto e quantidade.
-     *
-     * IMPORTANTE:
-     * agora comparamos existingOrder.product_id com
-     * product.id, pois ambos são o UUID real do banco.
-     */
-
-    const {
-      data: existingOrder,
-      error: existingOrderError,
-    } = await admin
+    const { data: existingOrder, error: existingOrderError } = await admin
       .from('orders')
-      .select(
-        'id, user_id, product_id, quantity, total_cents, status, payment_preference_id',
-      )
+      .select('id, user_id, product_id, quantity, total_cents, status, payment_preference_id')
       .eq('user_id', user.id)
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle()
 
     if (existingOrderError) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Não foi possível verificar a Idempotency-Key.',
-        },
+        { ok: false, error: 'Não foi possível verificar a Idempotency-Key.' },
         { status: 500 },
       )
     }
 
     if (existingOrder) {
-      /*
-       * A mesma chave não pode ser reutilizada
-       * com outro produto ou quantidade.
-       */
-
       if (
         existingOrder.product_id !== product.id ||
         existingOrder.quantity !== quantity
@@ -354,71 +223,44 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             ok: false,
-            error:
-              'Esta Idempotency-Key já foi utilizada em outra operação.',
+            error: 'Esta Idempotency-Key já foi utilizada em outra operação.',
           },
           { status: 409 },
         )
       }
 
-      /*
-       * O pedido já existe.
-       *
-       * Se já possui Mercado Pago associado,
-       * recuperamos novamente o PIX.
-       */
-
       if (existingOrder.payment_preference_id) {
         try {
-          const mercadoPagoOrder =
-            await getMercadoPagoOrder(
-              mercadoPagoToken,
-              existingOrder.payment_preference_id,
-            )
-
-          const {
-            qrCode,
-            qrCodeBase64,
-          } = extractPaymentData(
-            mercadoPagoOrder,
+          const mercadoPagoOrder = await getMercadoPagoOrder(
+            mercadoPagoToken,
+            existingOrder.payment_preference_id,
           )
+          const { qrCode, qrCodeBase64 } = extractPaymentData(mercadoPagoOrder)
 
           return NextResponse.json({
             ok: true,
             orderId: existingOrder.id,
-            mercadoPagoOrderId:
-              existingOrder.payment_preference_id,
+            mercadoPagoOrderId: existingOrder.payment_preference_id,
             qrCode,
             qrCodeBase64,
             idempotent: true,
           })
         } catch (error) {
-          console.error(
-            'Erro ao recuperar pedido idempotente:',
-            error,
-          )
-
+          console.error('Erro ao recuperar pedido idempotente:', error)
           return NextResponse.json(
             {
               ok: false,
-              error:
-                'O pedido já existe, mas não foi possível recuperar os dados do pagamento.',
+              error: 'O pedido já existe, mas não foi possível recuperar os dados do pagamento.',
             },
             { status: 502 },
           )
         }
       }
 
-      /*
-       * Existe pedido, mas o Mercado Pago ainda não
-       * foi associado.
-       */
-
       return NextResponse.json(
         {
           ok: false,
-          error:
-            'Esta operação já possui um pedido em processamento.',
+          error: 'Esta operação já possui um pedido em processamento.',
           orderId: existingOrder.id,
           idempotent: true,
         },
@@ -426,23 +268,8 @@ export async function POST(request: Request) {
       )
     }
 
-    /*
-     * ==========================================================
-     * RATE LIMIT
-     * ==========================================================
-     *
-     * Só aplicamos o limite se for uma NOVA operação.
-     *
-     * Repetições da mesma Idempotency-Key não consomem
-     * outra tentativa.
-     */
-
     const ipAddress = getClientIp(request)
-
-    const {
-      data: rateLimit,
-      error: rateLimitError,
-    } = await admin.rpc(
+    const { data: rateLimit, error: rateLimitError } = await admin.rpc(
       'check_order_rate_limit',
       {
         p_user_id: user.id,
@@ -453,83 +280,61 @@ export async function POST(request: Request) {
     )
 
     if (rateLimitError) {
-      console.error(
-        'Erro no rate limit:',
-        rateLimitError,
-      )
-
+      console.error('Erro no rate limit:', rateLimitError)
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Não foi possível validar o limite de pedidos.',
-        },
+        { ok: false, error: 'Não foi possível validar o limite de pedidos.' },
         { status: 500 },
       )
     }
 
-    const rateLimitResult =
-      Array.isArray(rateLimit)
-        ? rateLimit[0]
-        : rateLimit
-
+    const rateLimitResult = Array.isArray(rateLimit) ? rateLimit[0] : rateLimit
     if (!rateLimitResult?.allowed) {
-      const retryAfter = Math.max(
-        1,
-        Number(
-          rateLimitResult?.retry_after ?? 60,
-        ),
-      )
-
+      const retryAfter = Math.max(1, Number(rateLimitResult?.retry_after ?? 60))
       return NextResponse.json(
         {
           ok: false,
-          error:
-            'Limite de pedidos atingido. Aguarde antes de tentar novamente.',
+          error: 'Limite de pedidos atingido. Aguarde antes de tentar novamente.',
           retryAfter,
         },
         {
           status: 429,
-          headers: {
-            'Retry-After':
-              String(retryAfter),
-          },
+          headers: { 'Retry-After': String(retryAfter) },
         },
       )
     }
 
-    /*
-     * ==========================================================
-     * PREÇO
-     * ==========================================================
-     *
-     * O frontend NÃO controla:
-     *
-     * - preço
-     * - total
-     * - desconto
-     * - valor enviado ao Mercado Pago
-     */
+    /* Bloqueio de estoque antes de criar o pedido e antes de chamar o Mercado Pago. */
+    const { count: availableStock, error: stockError } = await admin
+      .from('activation_codes')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+      .is('user_id', null)
 
-    const unitPriceCents =
-      getUnitPriceCents(quantity)
+    if (stockError) {
+      console.error('Erro ao verificar estoque:', stockError)
+      return NextResponse.json(
+        { ok: false, error: 'Não foi possível verificar o estoque no momento.' },
+        { status: 500 },
+      )
+    }
 
-    const totalCents =
-      unitPriceCents * quantity
+    const stock = availableStock ?? 0
+    if (stock < quantity) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Estoque insuficiente. Temos apenas ${stock} código(s) disponível(is) no momento para esta compra.`,
+          availableStock: stock,
+        },
+        { status: 409 },
+      )
+    }
 
-    const amount =
-      (totalCents / 100).toFixed(2)
+    const unitPriceCents = getUnitPriceCents(quantity)
+    const totalCents = unitPriceCents * quantity
+    const amount = (totalCents / 100).toFixed(2)
 
-    /*
-     * ==========================================================
-     * CRIAÇÃO DO PEDIDO
-     * ==========================================================
-     */
-
-    const {
-      data: order,
-      error: orderError,
-    } = await admin
+    const { data: order, error: orderError } = await admin
       .from('orders')
       .insert({
         user_id: user.id,
@@ -542,90 +347,51 @@ export async function POST(request: Request) {
       .select('id')
       .single()
 
-    /*
-     * ==========================================================
-     * CONCORRÊNCIA
-     * ==========================================================
-     *
-     * Se duas requisições simultâneas chegaram com a mesma
-     * chave, o índice UNIQUE do banco impede dois pedidos.
-     */
-
     if (orderError || !order) {
       if (orderError?.code === '23505') {
-        const {
-          data: concurrentOrder,
-        } = await admin
+        const { data: concurrentOrder } = await admin
           .from('orders')
-          .select(
-            'id, product_id, quantity, status, payment_preference_id',
-          )
+          .select('id, product_id, quantity, status, payment_preference_id')
           .eq('user_id', user.id)
           .eq('idempotency_key', idempotencyKey)
           .maybeSingle()
 
         if (concurrentOrder) {
           if (
-            concurrentOrder.product_id !==
-              product.id ||
-            concurrentOrder.quantity !==
-              quantity
+            concurrentOrder.product_id !== product.id ||
+            concurrentOrder.quantity !== quantity
           ) {
             return NextResponse.json(
               {
                 ok: false,
-                error:
-                  'Esta Idempotency-Key já foi utilizada em outra operação.',
+                error: 'Esta Idempotency-Key já foi utilizada em outra operação.',
               },
               { status: 409 },
             )
           }
 
-          /*
-           * Se a requisição concorrente já conseguiu
-           * criar o pagamento, recuperamos o PIX.
-           */
-
-          if (
-            concurrentOrder.payment_preference_id
-          ) {
+          if (concurrentOrder.payment_preference_id) {
             try {
-              const mercadoPagoOrder =
-                await getMercadoPagoOrder(
-                  mercadoPagoToken,
-                  concurrentOrder.payment_preference_id,
-                )
-
-              const {
-                qrCode,
-                qrCodeBase64,
-              } = extractPaymentData(
-                mercadoPagoOrder,
+              const mercadoPagoOrder = await getMercadoPagoOrder(
+                mercadoPagoToken,
+                concurrentOrder.payment_preference_id,
               )
-
+              const { qrCode, qrCodeBase64 } = extractPaymentData(mercadoPagoOrder)
               return NextResponse.json({
                 ok: true,
-                orderId:
-                  concurrentOrder.id,
-                mercadoPagoOrderId:
-                  concurrentOrder.payment_preference_id,
+                orderId: concurrentOrder.id,
+                mercadoPagoOrderId: concurrentOrder.payment_preference_id,
                 qrCode,
                 qrCodeBase64,
                 idempotent: true,
               })
             } catch (error) {
-              console.error(
-                'Erro ao recuperar pagamento concorrente:',
-                error,
-              )
-
+              console.error('Erro ao recuperar pagamento concorrente:', error)
               return NextResponse.json(
                 {
                   ok: false,
-                  error:
-                    'O pedido já existe, mas não foi possível recuperar os dados do pagamento.',
-                  orderId:
-                    concurrentOrder.id,
+                  error: 'O pedido já existe, mas não foi possível recuperar os dados do pagamento.',
+                  orderId: concurrentOrder.id,
                 },
                 { status: 502 },
               )
@@ -635,10 +401,8 @@ export async function POST(request: Request) {
           return NextResponse.json(
             {
               ok: false,
-              error:
-                'Esta operação já possui um pedido em processamento.',
-              orderId:
-                concurrentOrder.id,
+              error: 'Esta operação já possui um pedido em processamento.',
+              orderId: concurrentOrder.id,
               idempotent: true,
             },
             { status: 409 },
@@ -649,21 +413,11 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            `Não foi possível criar o pedido: ${
-              orderError?.message ??
-              'Erro desconhecido'
-            }`,
+          error: `Não foi possível criar o pedido: ${orderError?.message ?? 'Erro desconhecido'}`,
         },
         { status: 500 },
       )
     }
-
-    /*
-     * ==========================================================
-     * MERCADO PAGO
-     * ==========================================================
-     */
 
     const mercadoPagoBody = {
       type: 'online',
@@ -690,117 +444,63 @@ export async function POST(request: Request) {
       },
     }
 
-    /*
-     * Essa chave é exclusiva da chamada ao Mercado Pago.
-     */
-
-    const mercadoPagoIdempotencyKey =
-      randomUUID()
-
+    const mercadoPagoIdempotencyKey = randomUUID()
     const headers: Record<string, string> = {
-      Authorization:
-        `Bearer ${mercadoPagoToken}`,
-      'Content-Type':
-        'application/json',
-      'X-Idempotency-Key':
-        mercadoPagoIdempotencyKey,
+      Authorization: `Bearer ${mercadoPagoToken}`,
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': mercadoPagoIdempotencyKey,
     }
 
     if (mercadoPagoIntegratorId) {
-      headers['X-Integrator-Id'] =
-        mercadoPagoIntegratorId
+      headers['X-Integrator-Id'] = mercadoPagoIntegratorId
     }
 
-    const response = await fetch(
-      'https://api.mercadopago.com/v1/orders',
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(
-          mercadoPagoBody,
-        ),
-        cache: 'no-store',
-      },
-    )
+    const response = await fetch('https://api.mercadopago.com/v1/orders', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(mercadoPagoBody),
+      cache: 'no-store',
+    })
 
-    const responseText =
-      await response.text()
+    const responseText = await response.text()
 
     if (!response.ok) {
       await admin
         .from('orders')
-        .update({
-          status: 'cancelled',
-        })
+        .update({ status: 'cancelled' })
         .eq('id', order.id)
 
       return NextResponse.json(
         {
           ok: false,
-          error:
-            `Mercado Pago erro ${response.status}: ${responseText}`,
+          error: `Mercado Pago erro ${response.status}: ${responseText}`,
         },
         { status: 502 },
       )
     }
 
     let mercadoPagoOrder: any
-
     try {
-      mercadoPagoOrder =
-        JSON.parse(responseText)
+      mercadoPagoOrder = JSON.parse(responseText)
     } catch {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'O Mercado Pago retornou uma resposta inválida.',
-        },
+        { ok: false, error: 'O Mercado Pago retornou uma resposta inválida.' },
         { status: 502 },
       )
     }
 
-    /*
-     * ==========================================================
-     * SALVA ID DO MERCADO PAGO
-     * ==========================================================
-     */
-
-    const mercadoPagoOrderId =
-      String(
-        mercadoPagoOrder.id ??
-          mercadoPagoOrder.order_id ??
-          '',
-      )
+    const mercadoPagoOrderId = String(
+      mercadoPagoOrder.id ?? mercadoPagoOrder.order_id ?? '',
+    )
 
     if (mercadoPagoOrderId) {
       await admin
         .from('orders')
-        .update({
-          payment_preference_id:
-            mercadoPagoOrderId,
-        })
+        .update({ payment_preference_id: mercadoPagoOrderId })
         .eq('id', order.id)
     }
 
-    /*
-     * ==========================================================
-     * QR CODE
-     * ==========================================================
-     */
-
-    const {
-      qrCode,
-      qrCodeBase64,
-    } = extractPaymentData(
-      mercadoPagoOrder,
-    )
-
-    /*
-     * ==========================================================
-     * RESPOSTA
-     * ==========================================================
-     */
+    const { qrCode, qrCodeBase64 } = extractPaymentData(mercadoPagoOrder)
 
     return NextResponse.json({
       ok: true,
@@ -811,22 +511,11 @@ export async function POST(request: Request) {
       idempotent: false,
     })
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Erro desconhecido'
-
-    console.error(
-      'Erro ao criar pedido:',
-      error,
-    )
+    const message = error instanceof Error ? error.message : 'Erro desconhecido'
+    console.error('Erro ao criar pedido:', error)
 
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          `Erro ao criar pagamento: ${message}`,
-      },
+      { ok: false, error: `Erro ao criar pagamento: ${message}` },
       { status: 500 },
     )
   }
