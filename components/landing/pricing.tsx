@@ -265,30 +265,30 @@ export function Pricing({
       >
         <div className="mx-auto max-w-xl px-3 sm:px-4">
           {product && (
-            <div className="relative mx-auto max-w-sm rounded-2xl border border-primary bg-card p-2.5 shadow-lg shadow-primary/10">
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-semibold text-primary-foreground">
+            <div className="relative mx-auto max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10">
+              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 30 dias de acesso
               </div>
 
-              <div className="pt-0.5 text-center">
-                <h3 className="text-lg font-bold">LD CLOUD VIP</h3>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-2xl font-bold">{formatBRL(unitPriceCents)}</span>
-                  <span className="text-[10px] text-muted-foreground">/ tela</span>
+              <div className="pt-1 text-center">
+                <h3 className="text-xl font-bold">LD CLOUD VIP</h3>
+                <div className="mt-0.5 flex items-baseline justify-center gap-1">
+                  <span className="text-3xl font-bold">{formatBRL(unitPriceCents)}</span>
+                  <span className="text-xs text-muted-foreground">/ tela</span>
                 </div>
               </div>
 
-              <div className="mt-2">
-                <div className="flex items-center gap-1.5">
+              <div className="mt-3">
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-7 shrink-0"
+                    className="size-8 shrink-0"
                     onClick={() => changeQuantity(quantity - 1)}
                     disabled={pending || quantity <= 1}
                   >
-                    <Minus className="size-3.5" />
+                    <Minus className="size-4" />
                   </Button>
 
                   <input
@@ -306,7 +306,7 @@ export function Pricing({
                         setRateLimitMessage(null)
                       }
                     }}
-                    className={`h-7 w-full rounded-lg border bg-background px-2 text-center text-sm font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`}
+                    className={`h-8 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`}
                     aria-label="Quantidade de telas"
                     autoComplete="off"
                   />
@@ -315,16 +315,16 @@ export function Pricing({
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="size-7 shrink-0"
+                    className="size-8 shrink-0"
                     onClick={() => changeQuantity(quantity + 1)}
                     disabled={pending || quantity >= 500}
                   >
-                    <Plus className="size-3.5" />
+                    <Plus className="size-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-1.5 text-center text-[9px]">
+              <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]">
                 <div className={quantity < 5 ? 'font-bold text-primary' : 'text-muted-foreground'}>
                   <div>1–4</div>
                   <div>R$ 35</div>
@@ -339,40 +339,40 @@ export function Pricing({
                 </div>
               </div>
 
-              <div className="mt-1.5 flex items-center justify-between rounded-lg border bg-background px-2.5 py-1.5">
-                <span className="text-[10px] text-muted-foreground">
+              <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2">
+                <span className="text-xs text-muted-foreground">
                   {quantity} tela{quantity === 1 ? '' : 's'} × {formatBRL(unitPriceCents)}
                 </span>
-                <span className="text-base font-bold">{formatBRL(totalCents)}</span>
+                <span className="text-lg font-bold">{formatBRL(totalCents)}</span>
               </div>
 
-              <div className="mt-1.5 grid grid-cols-4 gap-1 border-t pt-1.5">
-                <div className="flex items-center justify-center gap-1 text-[8px] text-muted-foreground">
-                  <Check className="size-2.5 shrink-0 text-primary" />
-                  VIP 30d
+              <div className="mt-2 grid grid-cols-4 gap-1 border-t pt-2">
+                <div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  <span>Acesso imediato</span>
                 </div>
-                <div className="flex items-center justify-center gap-1 text-[8px] text-muted-foreground">
-                  <Check className="size-2.5 shrink-0 text-primary" />
-                  Simultâneas
+                <div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  <span>Vários dispositivos</span>
                 </div>
-                <div className="flex items-center justify-center gap-1 text-[8px] text-muted-foreground">
-                  <Check className="size-2.5 shrink-0 text-primary" />
-                  WhatsApp
+                <div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  <span>Ativação por código</span>
                 </div>
-                <div className="flex items-center justify-center gap-1 text-[8px] text-muted-foreground">
-                  <Check className="size-2.5 shrink-0 text-primary" />
-                  PIX
+                <div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground">
+                  <Check className="size-3 shrink-0 text-primary" />
+                  <span>Pagamento seguro (PIX)</span>
                 </div>
               </div>
 
               <Button
-                className="mt-1.5 h-8 w-full text-xs"
+                className="mt-2 h-9 w-full text-sm"
                 onClick={handleBuy}
                 disabled={pending || !product || !inputIsValid}
               >
                 {pending ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" />
                     Processando...
                   </>
                 ) : (
@@ -383,9 +383,9 @@ export function Pricing({
               </Button>
 
               {rateLimitMessage && (
-                <div role="alert" className="mt-1.5 rounded-lg border border-red-500/40 bg-red-500/10 p-1.5 text-center">
-                  <p className="text-[9px] font-semibold text-red-500">🚫 Limite de pedidos atingido</p>
-                  <p className="text-[8px] text-muted-foreground">{rateLimitMessage}</p>
+                <div role="alert" className="mt-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-center">
+                  <p className="text-xs font-semibold text-red-500">🚫 Limite de pedidos atingido</p>
+                  <p className="text-[10px] text-muted-foreground">{rateLimitMessage}</p>
                 </div>
               )}
             </div>
