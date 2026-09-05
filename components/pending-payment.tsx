@@ -95,11 +95,13 @@ export function PendingPayment() {
           setPaymentState('confirmed')
           setPayment(null)
           toast.success('Pagamento confirmado com sucesso!')
+          router.refresh()
         } else if (data.status === 'cancelled') {
           setPaymentState('cancelled')
           setPayment(null)
           setOrder(null)
           toast.error('Este pagamento foi cancelado.')
+          router.refresh()
         }
       } catch {
         // Uma falha momentânea não interrompe a verificação.
@@ -112,7 +114,7 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [pathname, order?.orderId, paymentState])
+  }, [pathname, order?.orderId, paymentState, router])
 
   async function resumePayment() {
     if (!order) return
