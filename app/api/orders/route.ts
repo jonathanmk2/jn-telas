@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { ok: false, error: 'Você precisa estar logado para realizar uma compra.' },
+      { ok: false, needsAuth: true, error: 'Você precisa estar logado para realizar uma compra.' },
       { status: 401 },
     )
   }
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
   const { data: existingByIdempotency, error: idempotencyError } = await admin
     .from('orders')
-    .select('id, status, total_cents, quantity, payment_preference_id')
+    .select('id, status, total_cents, quantity, payment_preference_id, created_at')
     .eq('user_id', user.id)
     .eq('idempotency_key', idempotencyKey)
     .maybeSingle()
@@ -123,15 +123,26 @@ export async function POST(request: Request) {
   }
 
   if (existingByIdempotency) {
-    return NextResponse.json({
-      ok: true,
-      existing: true,
-      orderId: existingByIdempotency.id,
-      status: existingByIdempotency.status,
-      totalCents: existingByIdempotency.total_cents,
-      quantity: existingByIdempotency.quantity,
-      mercadoPagoOrderId: existingByIdempotency.payment_preference_id,
-    })
+    if (
+      existingByIdempotency.status === 'pending' &&
+      existingByIdempotency.created_at &&
+      new Date(existingByIdempotency.created_at).getTime() <= Date.now() - 10 * 60 * 1000
+    ) {
+      await admin.rpc('cancel_pending_order', {
+        p_order_id: existingByIdempotency.id,
+        p_user_id: user.id,
+      })
+    } else {
+      return NextResponse.json({
+        ok: true,
+        existing: true,
+        orderId: existingByIdempotency.id,
+        status: existingByIdempotency.status,
+        totalCents: existingByIdempotency.total_cents,
+        quantity: existingByIdempotency.quantity,
+        mercadoPagoOrderId: existingByIdempotency.payment_preference_id,
+      })
+    }
   }
 
   const { data: existingPending, error: pendingError } = await admin
@@ -152,47 +163,36 @@ export async function POST(request: Request) {
   }
 
   if (existingPending) {
-    return NextResponse.json(
-      {
-        ok: false,
-        duplicatePending: true,
-        orderId: existingPending.id,
-        status: existingPending.status,
-        totalCents: existingPending.total_cents,
-        quantity: existingPending.quantity,
-        mercadoPagoOrderId: existingPending.payment_preference_id,
-        error:
-          'Você já possui um pagamento pendente. Finalize ou cancele esse pagamento antes de realizar uma nova compra.',
-      },
-      { status: 409 },
-    )
-  }
+    const expiresAt = new Date(existingPending.created_at).getTime() + 10 * 60 * 1000
 
-  const { count: availableStock, error: stockError } = await admin
-    .from('activation_codes')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .is('user_id', null)
+    if (Date.now() >= expiresAt) {
+      const { data: cancelled, error: cancelError } = await admin.rpc('cancel_pending_order', {
+        p_order_id: existingPending.id,
+        p_user_id: user.id,
+      })
 
-  if (stockError) {
-    console.error('Erro ao verificar estoque:', stockError)
-    return NextResponse.json(
-      { ok: false, error: 'Não foi possível verificar o estoque no momento.' },
-      { status: 500 },
-    )
-  }
-
-  const stock = availableStock ?? 0
-
-  if (stock < quantity) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `Estoque insuficiente. Temos apenas ${stock} código(s) disponível(is) no momento para esta compra.`,
-        availableStock: stock,
-      },
-      { status: 409 },
-    )
+      if (cancelError || !cancelled) {
+        console.error('Erro ao expirar pedido pendente:', cancelError)
+        return NextResponse.json(
+          { ok: false, error: 'Não foi possível liberar o pagamento pendente.' },
+          { status: 500 },
+        )
+      }
+    } else {
+      return NextResponse.json(
+        {
+          ok: false,
+          duplicatePending: true,
+          orderId: existingPending.id,
+          status: existingPending.status,
+          totalCents: existingPending.total_cents,
+          quantity: existingPending.quantity,
+          mercadoPagoOrderId: existingPending.payment_preference_id,
+          error: 'Você já possui um pagamento pendente. Finalize ou cancele esse pagamento antes de realizar uma nova compra.',
+        },
+        { status: 409 },
+      )
+    }
   }
 
   const unitPriceCents = getBackendUnitPrice(quantity)
@@ -212,10 +212,63 @@ export async function POST(request: Request) {
     .single()
 
   if (orderError || !order) {
+    if (orderError?.code === '23505') {
+      const { data: concurrentPending } = await admin
+        .from('orders')
+        .select('id, status, total_cents, quantity, payment_preference_id, created_at')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (concurrentPending) {
+        return NextResponse.json(
+          {
+            ok: false,
+            duplicatePending: true,
+            orderId: concurrentPending.id,
+            status: concurrentPending.status,
+            totalCents: concurrentPending.total_cents,
+            quantity: concurrentPending.quantity,
+            mercadoPagoOrderId: concurrentPending.payment_preference_id,
+            error: 'Você já possui um pagamento pendente. Finalize ou cancele esse pagamento antes de realizar uma nova compra.',
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     console.error('Erro ao criar pedido:', orderError)
     return NextResponse.json(
       { ok: false, error: 'Não foi possível criar o pedido.' },
       { status: 500 },
+    )
+  }
+
+  const { data: reservedCount, error: reservationError } = await admin.rpc(
+    'reserve_activation_codes',
+    {
+      p_order_id: order.id,
+      p_quantity: quantity,
+      p_minutes: 10,
+    },
+  )
+
+  if (reservationError || Number(reservedCount ?? 0) !== quantity) {
+    console.error('Erro ao reservar códigos:', reservationError, reservedCount)
+
+    await admin.rpc('release_activation_code_reservations', {
+      p_order_id: order.id,
+    })
+    await admin.from('orders').delete().eq('id', order.id).eq('status', 'pending')
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Estoque insuficiente. Os códigos disponíveis foram reservados por outros pedidos ou não estão disponíveis no momento.',
+      },
+      { status: 409 },
     )
   }
 
@@ -224,10 +277,10 @@ export async function POST(request: Request) {
   if (!accessToken) {
     console.error('MERCADO_PAGO_ACCESS_TOKEN não configurado.')
 
-    await admin
-      .from('orders')
-      .update({ status: 'cancelled' })
-      .eq('id', order.id)
+    await admin.rpc('release_activation_code_reservations', {
+      p_order_id: order.id,
+    })
+    await admin.from('orders').delete().eq('id', order.id).eq('status', 'pending')
 
     return NextResponse.json(
       { ok: false, error: 'Pagamento indisponível no momento.' },
@@ -240,10 +293,7 @@ export async function POST(request: Request) {
     type: 'online',
     total_amount: (totalCents / 100).toFixed(2),
     external_reference: externalReference,
-    description:
-      quantity === 1
-        ? '1 Tela JN TELAS'
-        : `${quantity} Telas JN TELAS`,
+    description: quantity === 1 ? '1 Tela JN TELAS' : `${quantity} Telas JN TELAS`,
     transactions: {
       payments: [
         {
@@ -271,10 +321,10 @@ export async function POST(request: Request) {
     const errorText = await mercadoPagoResponse.text()
     console.error('Erro Mercado Pago:', errorText)
 
-    await admin
-      .from('orders')
-      .update({ status: 'cancelled' })
-      .eq('id', order.id)
+    await admin.rpc('release_activation_code_reservations', {
+      p_order_id: order.id,
+    })
+    await admin.from('orders').delete().eq('id', order.id).eq('status', 'pending')
 
     return NextResponse.json(
       { ok: false, error: 'Não foi possível criar o pagamento.' },
@@ -287,12 +337,29 @@ export async function POST(request: Request) {
   const qrCode = mercadoPagoOrder?.transactions?.payments?.[0]?.payment_method?.qr_code ?? null
   const qrCodeBase64 = mercadoPagoOrder?.transactions?.payments?.[0]?.payment_method?.qr_code_base64 ?? null
 
-  await admin
-    .from('orders')
-    .update({
-      payment_preference_id: mercadoPagoOrderId,
+  if (!mercadoPagoOrderId || !qrCode) {
+    console.error('Mercado Pago retornou pedido sem QR Code:', mercadoPagoOrder)
+
+    await admin.rpc('release_activation_code_reservations', {
+      p_order_id: order.id,
     })
+    await admin.from('orders').delete().eq('id', order.id).eq('status', 'pending')
+
+    return NextResponse.json(
+      { ok: false, error: 'Não foi possível gerar o PIX.' },
+      { status: 502 },
+    )
+  }
+
+  const { error: paymentReferenceError } = await admin
+    .from('orders')
+    .update({ payment_preference_id: mercadoPagoOrderId })
     .eq('id', order.id)
+    .eq('status', 'pending')
+
+  if (paymentReferenceError) {
+    console.error('Erro ao salvar ID do Mercado Pago:', paymentReferenceError)
+  }
 
   return NextResponse.json({
     ok: true,
