@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processPayment({
+export async function processPayment({
   admin,
   orderId,
   paymentId,
@@ -111,7 +111,6 @@ async function processPayment({
     .maybeSingle()
 
   if (orderError || !order) {
-    // Pedido pode ter expirado e sido removido após 10 minutos.
     console.log('Pedido não encontrado; pagamento não será entregue:', orderId)
     return
   }
