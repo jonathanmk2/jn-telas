@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const { data: order, error } = await admin
       .from('orders')
-      .select('id, user_id, status, activation_code_id, payment_preference_id, created_at')
+      .select('id, user_id, status, activation_code_id, payment_preference_id, payment_id, created_at')
       .eq('id', orderId)
       .maybeSingle()
 
@@ -36,12 +36,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Você não pode consultar este pedido.' }, { status: 403 })
     }
 
+    // Se o pedido já foi marcado como pago, tentamos a entrega novamente
+    // mesmo que o webhook tenha falhado ou chegado antes da reserva.
+    // O processPayment é idempotente e só usa códigos reservados/disponíveis.
+    if (order.status === 'paid') {
+      try {
+        const { processPayment } = await import('@/app/api/mercadopago/webhook/route')
+
+        await processPayment({
+          admin,
+          orderId: order.id,
+          paymentId: order.payment_id ? String(order.payment_id) : 'payment-status-retry',
+          paymentStatus: 'approved',
+        })
+      } catch (error) {
+        console.error('Erro ao tentar entregar pedido já pago:', error)
+      }
+    }
+
     // Fallback de confirmação: se o webhook do Mercado Pago ainda não processou
     // o pagamento, consultamos o pedido diretamente no Mercado Pago e executamos
-    // o mesmo fluxo de entrega usado pelo webhook. Isso evita pagamento aprovado
-    // ficar preso em PENDING/PAID sem entregar os códigos.
+    // o mesmo fluxo de entrega usado pelo webhook.
     if (
-      (order.status === 'pending' || order.status === 'paid') &&
+      order.status === 'pending' &&
       order.payment_preference_id
     ) {
       const mercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
