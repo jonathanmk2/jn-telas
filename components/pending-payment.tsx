@@ -88,12 +88,14 @@ export function PendingPayment() {
         if (!active) return
 
         if (data.status === 'paid' || data.status === 'delivered') {
-          // Primeiro atualiza os dados server-side da Minha Conta.
-          router.refresh()
-          // Mantém a confirmação visível enquanto a página é atualizada.
+          // Mostra a confirmação primeiro e depois faz um reload completo.
+          // Isso garante que a Minha Conta busque os pedidos e códigos já atualizados.
           setPaymentState('confirmed')
           setPayment(null)
           toast.success('Pagamento confirmado com sucesso!')
+          setTimeout(() => {
+            window.location.href = `/minha-conta?updated=${Date.now()}`
+          }, 1000)
         } else if (data.status === 'cancelled') {
           router.refresh()
           setPaymentState('cancelled')
@@ -197,7 +199,7 @@ export function PendingPayment() {
           <CheckCircle2 className="size-9 shrink-0 text-emerald-500" />
           <div>
             <p className="text-sm font-bold">Pagamento confirmado!</p>
-            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A página será atualizada automaticamente.</p>
           </div>
         </div>
       </div>
