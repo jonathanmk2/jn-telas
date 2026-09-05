@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export function CopyButton({
-  value,
+  code,
   className,
   label = 'Copiar código',
 }: {
-  value: string
+  code: string
   className?: string
   label?: string
 }) {
@@ -18,7 +18,7 @@ export function CopyButton({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(value)
+      await navigator.clipboard.writeText(code)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
