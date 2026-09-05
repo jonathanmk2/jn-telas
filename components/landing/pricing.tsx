@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Copy,
   Loader2,
+  MessageCircle,
   Minus,
   Plus,
   X,
@@ -67,6 +68,7 @@ export function Pricing({
   const [quantity, setQuantity] = useState(1)
   const [quantityInput, setQuantityInput] = useState('1')
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null)
+  const [stockMessage, setStockMessage] = useState<string | null>(null)
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const product =
@@ -84,6 +86,7 @@ export function Pricing({
     setQuantityInput(String(newQuantity))
     idempotencyKeyRef.current = null
     setRateLimitMessage(null)
+    setStockMessage(null)
   }
 
   function handleBuy() {
@@ -98,6 +101,7 @@ export function Pricing({
     }
 
     setRateLimitMessage(null)
+    setStockMessage(null)
 
     if (!isValidQuantityInput(quantityInput)) {
       toast.error('Quantidade inválida. Digite um número inteiro entre 1 e 500.')
@@ -155,6 +159,7 @@ export function Pricing({
           setOrderStatus('pending')
           idempotencyKeyRef.current = null
           setRateLimitMessage(null)
+          setStockMessage(null)
           toast.success(
             res.idempotent
               ? 'Pedido recuperado com sucesso!'
@@ -168,14 +173,23 @@ export function Pricing({
           return
         }
 
+        const errorMessage = res.error ?? 'Não foi possível criar o pedido.'
+        const isStockError = /estoque|c[oó]digos? dispon[ií]veis|insuficiente/i.test(errorMessage)
+
+        if (isStockError) {
+          setStockMessage(errorMessage)
+          idempotencyKeyRef.current = null
+          return
+        }
+
         if (response.status === 409) {
           toast.error(
-            res.error ?? 'Esta operação já possui um pedido em processamento.',
+            errorMessage,
           )
           return
         }
 
-        toast.error(res.error ?? 'Não foi possível criar o pedido.')
+        toast.error(errorMessage)
       } catch (error) {
         console.error('Erro inesperado:', error)
         toast.error('Ocorreu um erro inesperado ao gerar o pagamento. Tente novamente.')
@@ -304,6 +318,7 @@ export function Pricing({
                         setQuantity(Number(value))
                         idempotencyKeyRef.current = null
                         setRateLimitMessage(null)
+                        setStockMessage(null)
                       }
                     }}
                     className={`h-8 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`}
@@ -386,6 +401,22 @@ export function Pricing({
                 <div role="alert" className="mt-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-center">
                   <p className="text-xs font-semibold text-red-500">🚫 Limite de pedidos atingido</p>
                   <p className="text-[10px] text-muted-foreground">{rateLimitMessage}</p>
+                </div>
+              )}
+
+              {stockMessage && (
+                <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center">
+                  <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Estoque insuficiente</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{stockMessage}</p>
+                  <a
+                    href="https://wa.me/5585985373629?text=Ol%C3%A1%2C%20tentei%20comprar%20telas%20na%20JN%20TELAS%2C%20mas%20apareceu%20um%20alerta%20de%20estoque%20insuficiente.%20Gostaria%20de%20saber%20quando%20haver%C3%A1%20disponibilidade."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                  >
+                    <MessageCircle className="size-4" />
+                    Falar no WhatsApp
+                  </a>
                 </div>
               )}
             </div>
