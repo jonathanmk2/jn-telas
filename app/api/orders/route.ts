@@ -49,15 +49,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const productId = typeof body.productId === 'string' ? body.productId.trim() : ''
   const requestedQuantity = Number(body.quantity)
-
-  if (!productId) {
-    return NextResponse.json(
-      { ok: false, error: 'Produto inválido.' },
-      { status: 400 },
-    )
-  }
 
   if (
     !Number.isInteger(requestedQuantity) ||
@@ -185,6 +177,25 @@ export async function POST(request: Request) {
     }
   }
 
+  // O product_id no banco é UUID. Não confiamos no ID enviado pelo navegador:
+  // o produto válido é resolvido no servidor pela configuração de 1 tela.
+  const { data: product, error: productError } = await admin
+    .from('products')
+    .select('id')
+    .eq('active', true)
+    .eq('screens', 1)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (productError || !product) {
+    console.error('Erro ao localizar produto de 1 tela:', productError)
+    return NextResponse.json(
+      { ok: false, error: 'Produto indisponível no momento.' },
+      { status: 500 },
+    )
+  }
+
   const unitPriceCents = getBackendUnitPrice(quantity)
   const totalCents = unitPriceCents * quantity
 
@@ -192,7 +203,7 @@ export async function POST(request: Request) {
     .from('orders')
     .insert({
       user_id: user.id,
-      product_id: productId,
+      product_id: product.id,
       quantity,
       status: 'pending',
       total_cents: totalCents,
