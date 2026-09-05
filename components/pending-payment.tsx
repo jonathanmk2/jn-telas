@@ -41,13 +41,19 @@ export function PendingPayment() {
 
         const nextOrder = data.pending ?? null
 
+        // Nunca deixe o polling apagar a tela de confirmação.
         if (!nextOrder) {
-          setOrder(null)
-          setPayment(null)
+          if (paymentState !== 'confirmed') {
+            setOrder(null)
+            setPayment(null)
+          }
           return
         }
 
         if (nextOrder.orderId === dismissedOrderId) return
+
+        // Depois que o pagamento foi confirmado, não volte para o estado pendente.
+        if (paymentState === 'confirmed') return
 
         setOrder(nextOrder)
         setPaymentState('pending')
@@ -62,7 +68,7 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [pathname, dismissedOrderId])
+  }, [pathname, dismissedOrderId, paymentState])
 
   useEffect(() => {
     if (pathname !== '/minha-conta' || !order?.orderId || paymentState !== 'pending') return
@@ -88,14 +94,11 @@ export function PendingPayment() {
         if (!active) return
 
         if (data.status === 'paid' || data.status === 'delivered') {
-          // Mostra a confirmação primeiro e depois faz um reload completo.
-          // Isso garante que a Minha Conta busque os pedidos e códigos já atualizados.
+          // A confirmação fica aberta até o cliente clicar no X.
+          // A página só é atualizada depois que o modal for fechado.
           setPaymentState('confirmed')
           setPayment(null)
           toast.success('Pagamento confirmado com sucesso!')
-          setTimeout(() => {
-            window.location.href = `/minha-conta?updated=${Date.now()}`
-          }, 1000)
         } else if (data.status === 'cancelled') {
           router.refresh()
           setPaymentState('cancelled')
@@ -175,6 +178,8 @@ export function PendingPayment() {
     setPayment(null)
     setOrder(null)
     setPaymentState(null)
+    // Só agora, depois de fechar a confirmação, atualiza a Minha Conta.
+    router.refresh()
   }
 
   async function copyPix() {
@@ -192,14 +197,14 @@ export function PendingPayment() {
   if (paymentState === 'confirmed') {
     return (
       <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/30 bg-background p-4 shadow-2xl">
-        <button type="button" onClick={() => setPaymentState(null)} className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Fechar confirmação">
+        <button type="button" onClick={dismissPendingPayment} className="absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Fechar confirmação">
           <X className="size-4" />
         </button>
         <div className="flex items-center gap-3 pr-6">
           <CheckCircle2 className="size-9 shrink-0 text-emerald-500" />
           <div>
             <p className="text-sm font-bold">Pagamento confirmado!</p>
-            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A página será atualizada automaticamente.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.</p>
           </div>
         </div>
       </div>
