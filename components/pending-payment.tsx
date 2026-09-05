@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { CheckCircle2, Copy, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatBRL } from '@/lib/format'
@@ -19,6 +19,7 @@ type PaymentState = 'pending' | 'confirmed' | 'cancelled' | null
 
 export function PendingPayment() {
   const pathname = usePathname()
+  const router = useRouter()
   const [order, setOrder] = useState<PendingOrder | null>(null)
   const [payment, setPayment] = useState<{ qrCode: string | null; qrCodeBase64: string | null } | null>(null)
   const [paymentState, setPaymentState] = useState<PaymentState>(null)
@@ -158,6 +159,7 @@ export function PendingPayment() {
       setPaymentState('cancelled')
       setDismissedOrderId(orderId)
       toast.success('Pagamento cancelado. O estoque foi liberado.')
+      router.refresh()
     } catch {
       toast.error('Não foi possível cancelar o pagamento.')
     } finally {
