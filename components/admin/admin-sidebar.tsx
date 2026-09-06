@@ -52,8 +52,7 @@ function applySection(section: AdminSection) {
 
   const allowed = sectionRules[section]
 
-  // AdminDashboard usa um wrapper interno. Portanto, as seções podem
-  // estar aninhadas e não necessariamente serem filhas diretas do dashboard.
+  // O dashboard possui um wrapper interno, então procuramos todas as seções.
   dashboard.querySelectorAll('section').forEach((element) => {
     const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
 
@@ -68,12 +67,14 @@ function applySection(section: AdminSection) {
     element.style.display = shouldShow ? '' : 'none'
   })
 
+  // A visão geral mostra somente o resumo de vendas.
   if (salesSummary) {
     salesSummary.style.display = section === 'overview' ? '' : 'none'
   }
 
+  // O histórico administrativo aparece exclusivamente na aba Histórico.
   if (auditLog) {
-    auditLog.style.display = section === 'overview' || section === 'history' ? '' : 'none'
+    auditLog.style.display = section === 'history' ? '' : 'none'
   }
 }
 
@@ -87,8 +88,9 @@ export function AdminSidebar() {
     const applyWhenReady = () => {
       const dashboard = document.getElementById('admin-dashboard-content')
       const salesSummary = document.getElementById('admin-sales-summary')
+      const auditLog = document.getElementById('admin-audit-log')
 
-      if (!dashboard || !salesSummary) {
+      if (!dashboard || !salesSummary || !auditLog) {
         if (attempts < 20) {
           attempts += 1
           timer = window.setTimeout(applyWhenReady, 50)
