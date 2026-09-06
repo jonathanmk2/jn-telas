@@ -1,0 +1,37 @@
+name: Generate email logo PNG
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/jn-telas-logo.svg'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-logo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install SVG converter
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+
+      - name: Generate PNG
+        run: rsvg-convert -w 1200 -h 1200 public/jn-telas-logo.svg -o public/jn-telas-logo.png
+
+      - name: Commit PNG
+        run: |
+          if git diff --quiet -- public/jn-telas-logo.png; then
+            echo "PNG already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/jn-telas-logo.png
+          git commit -m "Generate PNG logo for email"
+          git push
