@@ -50,6 +50,7 @@ export function WhatsAppButton() {
         shadow-[#25D366]/30
         transition-transform
         hover:scale-105
+        animate-[whatsapp-float_2.8s_ease-in-out_infinite]
         sm:bottom-6
         sm:right-6
         sm:size-auto
