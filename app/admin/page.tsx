@@ -4,6 +4,7 @@ import { DashboardNavbar } from '@/components/dashboard/dashboard-navbar'
 import { AdminDashboard } from '@/components/admin/admin-dashboard'
 import { AdminAuditLog } from '@/components/admin/admin-audit-log'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
+import { AdminOrdersPanel } from '@/components/admin/admin-orders-panel'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -178,6 +179,8 @@ export default async function AdminPage() {
             <div id="admin-audit-log">
               <AdminAuditLog logs={auditLogs} />
             </div>
+
+            <AdminOrdersPanel orders={adminOrders} />
 
             <div id="admin-dashboard-content">
               <AdminDashboard customers={customers} codes={adminCodes} orders={adminOrders} productOptions={productOptions} customerOptions={customerOptions} />
