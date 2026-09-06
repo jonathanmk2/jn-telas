@@ -52,13 +52,11 @@ function applySection(section: AdminSection) {
 
   const allowed = sectionRules[section]
 
-  // Use inline display instead of the hidden attribute so the selected
-  // section cannot be overridden by global/component CSS rules.
-  Array.from(dashboard.children).forEach((child) => {
-    if (!(child instanceof HTMLElement)) return
-    if (child.tagName !== 'SECTION') return
+  // AdminDashboard usa um wrapper interno. Portanto, as seções podem
+  // estar aninhadas e não necessariamente serem filhas diretas do dashboard.
+  dashboard.querySelectorAll('section').forEach((element) => {
+    const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
 
-    const title = child.querySelector('h2')?.textContent?.trim() ?? ''
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
       : section === 'customers'
@@ -67,7 +65,7 @@ function applySection(section: AdminSection) {
           ? title.startsWith('Pedidos')
           : false
 
-    child.style.display = shouldShow ? '' : 'none'
+    element.style.display = shouldShow ? '' : 'none'
   })
 
   if (salesSummary) {
