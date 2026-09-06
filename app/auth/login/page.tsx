@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, MailCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +19,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -29,11 +31,12 @@ export default function LoginPage() {
 
     setLoading(true)
     setError(null)
+    setResendMessage(null)
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       if (error.message.toLowerCase().includes('email not confirmed')) {
-        setError('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.')
+        setError('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada ou reenvie o e-mail abaixo.')
       } else if (error.status === 429) {
         setError('Muitas tentativas. Aguarde um momento e tente novamente.')
       } else {
@@ -44,6 +47,36 @@ export default function LoginPage() {
     }
     router.push(next)
     router.refresh()
+  }
+
+  async function resendConfirmation() {
+    if (!email) {
+      setError('Digite seu e-mail para reenviar a confirmação.')
+      return
+    }
+
+    setResending(true)
+    setError(null)
+    setResendMessage(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    })
+
+    if (error) {
+      if (error.status === 429) {
+        setError('Aguarde um momento antes de solicitar outro e-mail de confirmação.')
+      } else {
+        setError('Não foi possível reenviar o e-mail agora. Tente novamente em alguns instantes.')
+      }
+    } else {
+      setResendMessage('Novo e-mail de confirmação enviado. Verifique também a pasta de spam.')
+    }
+    setResending(false)
   }
 
   return (
@@ -99,7 +132,13 @@ export default function LoginPage() {
           </p>
         )}
 
-        <Button type="submit" disabled={loading} className="mt-2">
+        {resendMessage && (
+          <p className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary" role="status">
+            {resendMessage}
+          </p>
+        )}
+
+        <Button type="submit" disabled={loading || resending} className="mt-2">
           {loading ? (
             <>
               <Loader2 className="size-4 animate-spin" /> Entrando...
@@ -108,6 +147,26 @@ export default function LoginPage() {
             'Entrar'
           )}
         </Button>
+
+        {error?.toLowerCase().includes('confirme seu e-mail') && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={resending}
+            onClick={resendConfirmation}
+            className="w-full"
+          >
+            {resending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Reenviando...
+              </>
+            ) : (
+              <>
+                <MailCheck className="size-4" /> Reenviar confirmação por e-mail
+              </>
+            )}
+          </Button>
+        )}
       </form>
     </AuthShell>
   )
