@@ -47,6 +47,12 @@ const sectionRules: Record<AdminSection, string[]> = {
   history: [],
 }
 
+function getSectionTitle(element: HTMLElement) {
+  return Array.from(element.querySelectorAll('h2'))
+    .map((heading) => heading.textContent?.trim() ?? '')
+    .find(Boolean) ?? ''
+}
+
 function applySection(section: AdminSection) {
   const dashboard = document.getElementById('admin-dashboard-content')
   const salesSummary = document.getElementById('admin-sales-summary')
@@ -57,7 +63,7 @@ function applySection(section: AdminSection) {
   const allowed = sectionRules[section]
 
   dashboard.querySelectorAll('section').forEach((element) => {
-    const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
+    const title = getSectionTitle(element)
 
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
@@ -72,12 +78,12 @@ function applySection(section: AdminSection) {
     element.style.display = shouldShow ? '' : 'none'
   })
 
-  const deliveredSection = Array.from(dashboard.querySelectorAll('section')).find(
-    (element) => {
-      const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
-      return title.startsWith('Códigos entregues')
-    },
-  )
+  const deliveredSection = Array.from(
+    dashboard.querySelectorAll('section'),
+  ).find((element) => {
+    const title = getSectionTitle(element)
+    return title.startsWith('Códigos entregues')
+  })
 
   if (deliveredSection) {
     Array.from(deliveredSection.children).forEach((child) => {
@@ -85,10 +91,13 @@ function applySection(section: AdminSection) {
     })
 
     if (section === 'sync') {
-      const syncHeading = Array.from(deliveredSection.querySelectorAll('h3')).find(
-        (element) => element.textContent?.trim().startsWith('Sincronizar códigos usados'),
+      const syncHeading = Array.from(
+        deliveredSection.querySelectorAll('h3'),
+      ).find((element) =>
+        element.textContent?.trim().startsWith('Sincronizar códigos usados'),
       )
-      const syncPanel = syncHeading?.parentElement?.parentElement
+
+      const syncPanel = syncHeading?.closest('div.rounded-xl')
 
       if (syncPanel) {
         Array.from(deliveredSection.children).forEach((child) => {
