@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+<title id="title">JN TELAS</title><desc id="desc">Logo JN TELAS com controle, raio e círculo neon azul e laranja</desc>
+<defs>
+  <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#19dfff"/><stop offset=".48" stop-color="#2376ff"/><stop offset=".58" stop-color="#ff7a18"/><stop offset="1" stop-color="#ffd21a"/></linearGradient>
+  <linearGradient id="j" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dfffff"/><stop offset=".28" stop-color="#1ce7ff"/><stop offset="1" stop-color="#0067ff"/></linearGradient>
+  <linearGradient id="n" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#d9e0ea"/><stop offset="1" stop-color="#ff8b20"/></linearGradient>
+  <linearGradient id="word" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff"/><stop offset=".28" stop-color="#dce4ee"/><stop offset=".48" stop-color="#19e5ff"/><stop offset="1" stop-color="#008bff"/></linearGradient>
+  <filter id="blueGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="13" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="warmGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<circle cx="500" cy="500" r="438" fill="#050814" fill-opacity=".96" stroke="#0a1020" stroke-width="18"/>
+<circle cx="500" cy="500" r="432" fill="none" stroke="url(#ring)" stroke-width="18" filter="url(#blueGlow)"/>
+<circle cx="500" cy="500" r="417" fill="none" stroke="url(#ring)" stroke-width="3" opacity=".9"/>
+<!-- controller/J -->
+<g filter="url(#blueGlow)" stroke="url(#j)" stroke-width="18" stroke-linejoin="round" fill="#071126">
+ <path d="M275 265h315c66 0 108 35 128 88l-56 46c-26-35-50-45-82-45H455l-35 30-80 25c-57 18-83 72-80 137 3 67 37 119 86 119 35 0 61-27 77-70l35-92 62-23 70 73c31 32 68 48 108 48h49c30 0 49-13 68-37l-40 122c-13 38-39 58-77 58H565l-67-79h-68c-14 45-39 79-81 79-60 0-99-53-102-133-3-86 30-139 95-160l83-27 45-39h-69z"/>
+ <path d="M348 397v91M303 443h91" stroke="#b9fbff" stroke-width="20" stroke-linecap="round"/>
+ <circle cx="582" cy="386" r="17" fill="#12dfff" stroke="none"/><circle cx="634" cy="438" r="17" fill="#ff7b1a" stroke="none"/><circle cx="531" cy="438" r="17" fill="#12dfff" stroke="none"/><circle cx="583" cy="490" r="17" fill="#ff7b1a" stroke="none"/>
+ <circle cx="430" cy="330" r="34" fill="#071126"/>
+</g>
+<!-- N -->
+<path d="M570 365L675 295l-42 210 119-165 65 40-135 213 103 126-78 42-104-135-37 116h-91l91-323z" fill="url(#n)" stroke="#ff8a18" stroke-width="7" filter="url(#warmGlow)"/>
+<!-- lightning -->
+<path d="M690 245l-116 205h87l-65 145 194-244h-92l72-106z" fill="#0b1426" stroke="#ffd21a" stroke-width="17" stroke-linejoin="round" filter="url(#warmGlow)"/>
+<path d="M690 272l-73 154h82l-39 91 91-128h-77l47-77z" fill="#18cfff" opacity=".95"/>
+<!-- wordmark -->
+<text x="500" y="755" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="118" font-style="italic" font-weight="900" letter-spacing="-5" fill="url(#word)" stroke="#061020" stroke-width="10" paint-order="stroke" filter="url(#blueGlow)">JN TELAS</text>
+</svg>
