@@ -27,9 +27,50 @@ export function PendingPayment() {
   const [cancelling, setCancelling] = useState(false)
   const [dismissedOrderId, setDismissedOrderId] = useState<string | null>(null)
 
+  // Mantém o overlay dos modais utilizável em qualquer tamanho de tela.
+  // Se o conteúdo for maior que a viewport, o próprio modal rola sem cortar
+  // título, QR Code ou botões.
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.setAttribute('data-jn-telas-payment-modal', 'true')
+    style.textContent = `
+      div.fixed.inset-0.z-50[class~="bg-black/70"] {
+        align-items: flex-start !important;
+        overflow-y: auto !important;
+        min-height: 100dvh !important;
+        padding-top: max(1rem, env(safe-area-inset-top)) !important;
+        padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+      }
+      div.fixed.inset-0.z-50[class~="bg-black/70"] > div {
+        max-height: calc(100dvh - 2rem) !important;
+        overflow-y: auto !important;
+        margin-top: auto !important;
+        margin-bottom: auto !important;
+      }
+      @media (max-width: 640px) {
+        div.fixed.inset-0.z-50[class~="bg-black/70"] {
+          padding-left: .75rem !important;
+          padding-right: .75rem !important;
+        }
+        div.fixed.inset-0.z-50[class~="bg-black/70"] > div {
+          max-width: 100% !important;
+          width: 100% !important;
+          max-height: calc(100dvh - 1.5rem) !important;
+          padding: 1rem !important;
+          border-radius: 1rem !important;
+        }
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      style.remove()
+    }
+  }, [])
+
   // O pagamento pendente é acompanhado em qualquer página. Assim,
-  // quando o PIX for aprovado, a sessão e os dados server-side podem
-  // ser atualizados imediatamente, mesmo com o modal de confirmação aberto.
+  // quando o PIX for aprovado, os dados server-side podem ser atualizados
+  // imediatamente, mesmo com o modal de confirmação aberto.
   useEffect(() => {
     let active = true
 
@@ -42,7 +83,6 @@ export function PendingPayment() {
 
         const nextOrder = data.pending ?? null
 
-        // Nunca deixe o polling apagar a tela de confirmação.
         if (!nextOrder) {
           if (paymentState !== 'confirmed') {
             setOrder(null)
@@ -52,8 +92,6 @@ export function PendingPayment() {
         }
 
         if (nextOrder.orderId === dismissedOrderId) return
-
-        // Depois que o pagamento foi confirmado, não volte para o estado pendente.
         if (paymentState === 'confirmed') return
 
         setOrder(nextOrder)
@@ -95,11 +133,9 @@ export function PendingPayment() {
         if (!active) return
 
         if (data.status === 'paid' || data.status === 'delivered') {
-          // Confirma visualmente sem fechar nenhum modal.
           setPaymentState('confirmed')
           setPayment(null)
-          // Atualiza imediatamente os Server Components / Minha Conta.
-          // O modal de confirmação continua aberto para o cliente.
+          // Atualiza a Minha Conta imediatamente, sem fechar o modal.
           router.refresh()
           toast.success('Pagamento confirmado com sucesso!')
         } else if (data.status === 'cancelled') {
@@ -250,8 +286,3 @@ export function PendingPayment() {
     </div>
   )
 }
-
-// O modal de PIX e o modal de confirmação pertencem ao Pricing. Este
-// estilo global garante que, principalmente em telas menores, o overlay
-// possa rolar e o conteúdo do modal nunca fique cortado pela viewport.
-// O seletor é limitado ao overlay escuro do pagamento.
