@@ -34,7 +34,7 @@ export default async function AdminPage() {
   const [profilesResult, codesResult, ordersResult, productsResult, auditLogsResult] = await Promise.all([
     admin.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
     admin.from('activation_codes').select('id, code, status, created_at, assigned_at, user_id, product_id, order_id').order('created_at', { ascending: false }),
-    admin.from('orders').select('id, status, total_cents, quantity, created_at, user_id, product_id').in('status', ['paid', 'delivered']).order('created_at', { ascending: false }),
+    admin.from('orders').select('id, status, total_cents, quantity, created_at, user_id, product_id').order('created_at', { ascending: false }),
     admin.from('products').select('id, name').order('name', { ascending: true }),
     admin.from('admin_audit_logs').select('id, action, entity_type, entity_id, description, metadata, created_at').order('created_at', { ascending: false }).limit(50),
   ])
@@ -53,11 +53,11 @@ export default async function AdminPage() {
 
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]))
   const productMap = new Map(products.map((product) => [product.id, product]))
-  const completedOrders = orders
+  const completedOrders = orders.filter((order) => ['paid', 'delivered'].includes(order.status))
 
   const salesSummary = {
     revenueCents: completedOrders.reduce((total, order) => total + (order.total_cents ?? 0), 0),
-    orders: orders.length,
+    orders: completedOrders.length,
     completedOrders: completedOrders.length,
     codesSold: completedOrders.reduce((total, order) => total + (order.quantity ?? 0), 0),
     availableStock: codes.filter((code) => code.status === 'active' && !code.user_id).length,
