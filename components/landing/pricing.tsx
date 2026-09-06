@@ -21,6 +21,30 @@ function isValidQuantityInput(value: string): boolean {
   return /^(?:[1-9]|[1-9]\d|[1-4]\d{2}|500)$/.test(value)
 }
 
+function LdCloudMascot() {
+  return (
+    <div className="relative mx-auto flex h-28 w-32 shrink-0 items-end justify-center sm:h-32 sm:w-36" aria-label="Mascote LD Cloud">
+      <div className="absolute bottom-2 h-20 w-24 rounded-[44%] bg-gradient-to-b from-slate-200 via-slate-100 to-slate-300 shadow-[0_0_28px_rgba(117,103,255,0.45)] sm:h-24 sm:w-28">
+        <div className="absolute -left-2 top-1/2 h-10 w-5 -translate-y-1/2 rounded-full border-2 border-slate-500/50 bg-slate-300" />
+        <div className="absolute -right-2 top-1/2 h-10 w-5 -translate-y-1/2 rounded-full border-2 border-slate-500/50 bg-slate-300" />
+        <div className="absolute left-1/2 top-1/2 flex h-12 w-[78%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[45%] border-2 border-slate-500/40 bg-slate-950 shadow-[inset_0_0_18px_rgba(35,112,255,0.45)] sm:h-14">
+          <div className="flex items-center gap-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+          </div>
+          <span className="absolute bottom-1.5 left-1/2 h-2 w-5 -translate-x-1/2 rounded-b-full border-b-2 border-cyan-300" />
+        </div>
+        <div className="absolute -bottom-5 left-1/2 flex h-10 w-20 -translate-x-1/2 items-center justify-center rounded-b-[45%] rounded-t-xl bg-slate-100 shadow-md">
+          <span className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-black tracking-wide text-slate-700">LD</span>
+        </div>
+      </div>
+      <div className="absolute bottom-7 left-0 h-7 w-10 rotate-12 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 opacity-90 blur-[1px]" />
+      <div className="absolute right-0 top-7 flex h-8 w-8 rotate-12 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white shadow-[0_0_16px_rgba(139,92,246,0.65)]">✓</div>
+      <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 rounded-full bg-primary/30 blur-md" />
+    </div>
+  )
+}
+
 export function Pricing({ products, isLoggedIn }: { products: Product[]; isLoggedIn: boolean }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -132,15 +156,24 @@ export function Pricing({ products, isLoggedIn }: { products: Product[]; isLogge
 
   return (
     <>
-      <section id="planos" className="scroll-mt-20 bg-secondary/30 py-3 sm:py-4">
-        <div className="mx-auto max-w-xl px-3 sm:px-4">
-          {product && <div className="relative mx-auto max-w-md rounded-2xl border border-primary bg-card p-3 shadow-lg shadow-primary/10">
+      <section id="planos" className="scroll-mt-20 bg-secondary/30 py-3 sm:py-5">
+        <div className="mx-auto max-w-2xl px-3 sm:px-4">
+          {product && <div className="relative mx-auto max-w-lg rounded-2xl border border-primary bg-card p-4 shadow-xl shadow-primary/15 sm:p-5">
             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-0.5 text-[10px] font-semibold text-primary-foreground">30 dias de acesso</div>
-            <div className="pt-1 text-center"><h3 className="text-xl font-bold">LD CLOUD VIP</h3><div className="mt-0.5 flex items-baseline justify-center gap-1"><span className="text-3xl font-bold">{formatBRL(unitPriceCents)}</span><span className="text-xs text-muted-foreground">/ tela</span></div></div>
+
+            <div className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3 pt-2 sm:grid-cols-[145px_minmax(0,1fr)] sm:gap-5 sm:pt-1">
+              <LdCloudMascot />
+              <div className="min-w-0 text-left">
+                <h3 className="text-lg font-bold sm:text-xl">LD CLOUD VIP</h3>
+                <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">Suas telas, sem limites.</p>
+                <div className="mt-1 flex items-baseline gap-1"><span className="text-3xl font-bold sm:text-4xl">{formatBRL(unitPriceCents)}</span><span className="text-xs text-muted-foreground">/ tela</span></div>
+              </div>
+            </div>
+
             <div className="mt-3"><div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" onClick={() => changeQuantity(quantity - 1)} disabled={pending || quantity <= 1}><Minus className="size-4" /></Button>
-              <input type="text" inputMode="numeric" value={quantityInput} disabled={pending} onChange={(event) => { const value = event.target.value; setQuantityInput(value); if (isValidQuantityInput(value)) { setQuantity(Number(value)); idempotencyKeyRef.current = null; setRateLimitMessage(null); setStockMessage(null); setPendingPaymentMessage(null) } }} className={`h-8 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`} aria-label="Quantidade de telas" autoComplete="off" />
-              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" onClick={() => changeQuantity(quantity + 1)} disabled={pending || quantity >= 500}><Plus className="size-4" /></Button>
+              <Button type="button" variant="outline" size="icon" className="size-9 shrink-0" onClick={() => changeQuantity(quantity - 1)} disabled={pending || quantity <= 1}><Minus className="size-4" /></Button>
+              <input type="text" inputMode="numeric" value={quantityInput} disabled={pending} onChange={(event) => { const value = event.target.value; setQuantityInput(value); if (isValidQuantityInput(value)) { setQuantity(Number(value)); idempotencyKeyRef.current = null; setRateLimitMessage(null); setStockMessage(null); setPendingPaymentMessage(null) } }} className={`h-9 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`} aria-label="Quantidade de telas" autoComplete="off" />
+              <Button type="button" variant="outline" size="icon" className="size-9 shrink-0" onClick={() => changeQuantity(quantity + 1)} disabled={pending || quantity >= 500}><Plus className="size-4" /></Button>
             </div></div>
             <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]"><div className={quantity < 5 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>1–4</div><div>R$ 35</div></div><div className={quantity >= 5 && quantity < 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>5–9</div><div>R$ 34</div></div><div className={quantity >= 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>10+</div><div>R$ 33</div></div></div>
             <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2"><span className="text-xs text-muted-foreground">{quantity} tela{quantity === 1 ? '' : 's'} × {formatBRL(unitPriceCents)}</span><span className="text-lg font-bold">{formatBRL(totalCents)}</span></div>
