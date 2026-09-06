@@ -27,9 +27,6 @@ export function PendingPayment() {
   const [cancelling, setCancelling] = useState(false)
   const [dismissedOrderId, setDismissedOrderId] = useState<string | null>(null)
 
-  // Mantém o overlay dos modais utilizável em qualquer tamanho de tela.
-  // Se o conteúdo for maior que a viewport, o próprio modal rola sem cortar
-  // título, QR Code ou botões.
   useEffect(() => {
     const style = document.createElement('style')
     style.setAttribute('data-jn-telas-payment-modal', 'true')
@@ -62,15 +59,11 @@ export function PendingPayment() {
       }
     `
     document.head.appendChild(style)
-
-    return () => {
-      style.remove()
-    }
+    return () => style.remove()
   }, [])
 
-  // O pagamento pendente é acompanhado em qualquer página. Assim,
-  // quando o PIX for aprovado, os dados server-side podem ser atualizados
-  // imediatamente, mesmo com o modal de confirmação aberto.
+  // Monitora o pedido em qualquer página. O aviso visual continua restrito
+  // à Minha Conta, mas a confirmação e o refresh podem ocorrer imediatamente.
   useEffect(() => {
     let active = true
 
@@ -83,13 +76,9 @@ export function PendingPayment() {
 
         const nextOrder = data.pending ?? null
 
-        if (!nextOrder) {
-          if (paymentState !== 'confirmed') {
-            setOrder(null)
-            setPayment(null)
-          }
-          return
-        }
+        // Não apague o pedido local quando o endpoint deixar de considerá-lo
+        // pendente. O payment-status ainda precisa confirmar se ele foi pago.
+        if (!nextOrder) return
 
         if (nextOrder.orderId === dismissedOrderId) return
         if (paymentState === 'confirmed') return
@@ -135,7 +124,6 @@ export function PendingPayment() {
         if (data.status === 'paid' || data.status === 'delivered') {
           setPaymentState('confirmed')
           setPayment(null)
-          // Atualiza a Minha Conta imediatamente, sem fechar o modal.
           router.refresh()
           toast.success('Pagamento confirmado com sucesso!')
         } else if (data.status === 'cancelled') {
@@ -230,8 +218,6 @@ export function PendingPayment() {
     }
   }
 
-  // Este componente mostra o aviso somente em Minha Conta, mas o
-  // monitoramento acima continua ativo nas demais páginas.
   if (pathname !== '/minha-conta') return null
 
   if (paymentState === 'confirmed') {
