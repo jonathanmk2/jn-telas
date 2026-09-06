@@ -27,9 +27,10 @@ export function PendingPayment() {
   const [cancelling, setCancelling] = useState(false)
   const [dismissedOrderId, setDismissedOrderId] = useState<string | null>(null)
 
+  // O pagamento pendente é acompanhado em qualquer página. Assim,
+  // quando o PIX for aprovado, a sessão e os dados server-side podem
+  // ser atualizados imediatamente, mesmo com o modal de confirmação aberto.
   useEffect(() => {
-    if (pathname !== '/minha-conta') return
-
     let active = true
 
     async function load() {
@@ -68,10 +69,10 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [pathname, dismissedOrderId, paymentState])
+  }, [dismissedOrderId, paymentState])
 
   useEffect(() => {
-    if (pathname !== '/minha-conta' || !order?.orderId || paymentState !== 'pending') return
+    if (!order?.orderId || paymentState !== 'pending') return
 
     let active = true
 
@@ -94,10 +95,12 @@ export function PendingPayment() {
         if (!active) return
 
         if (data.status === 'paid' || data.status === 'delivered') {
-          // A confirmação fica aberta até o cliente clicar no X.
-          // A página só é atualizada depois que o modal for fechado.
+          // Confirma visualmente sem fechar nenhum modal.
           setPaymentState('confirmed')
           setPayment(null)
+          // Atualiza imediatamente os Server Components / Minha Conta.
+          // O modal de confirmação continua aberto para o cliente.
+          router.refresh()
           toast.success('Pagamento confirmado com sucesso!')
         } else if (data.status === 'cancelled') {
           router.refresh()
@@ -117,7 +120,7 @@ export function PendingPayment() {
       active = false
       clearInterval(interval)
     }
-  }, [pathname, order?.orderId, paymentState, router])
+  }, [order?.orderId, paymentState, router])
 
   async function resumePayment() {
     if (!order) return
@@ -178,7 +181,6 @@ export function PendingPayment() {
     setPayment(null)
     setOrder(null)
     setPaymentState(null)
-    // Só agora, depois de fechar a confirmação, atualiza a Minha Conta.
     router.refresh()
   }
 
@@ -192,6 +194,8 @@ export function PendingPayment() {
     }
   }
 
+  // Este componente mostra o aviso somente em Minha Conta, mas o
+  // monitoramento acima continua ativo nas demais páginas.
   if (pathname !== '/minha-conta') return null
 
   if (paymentState === 'confirmed') {
@@ -204,7 +208,7 @@ export function PendingPayment() {
           <CheckCircle2 className="size-9 shrink-0 text-emerald-500" />
           <div>
             <p className="text-sm font-bold">Pagamento confirmado!</p>
-            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A entrega do código será atualizada automaticamente.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Seu pagamento foi aprovado com sucesso. A entrega do código foi atualizada automaticamente.</p>
           </div>
         </div>
       </div>
@@ -246,3 +250,8 @@ export function PendingPayment() {
     </div>
   )
 }
+
+// O modal de PIX e o modal de confirmação pertencem ao Pricing. Este
+// estilo global garante que, principalmente em telas menores, o overlay
+// possa rolar e o conteúdo do modal nunca fique cortado pela viewport.
+// O seletor é limitado ao overlay escuro do pagamento.
