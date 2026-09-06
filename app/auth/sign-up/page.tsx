@@ -53,13 +53,15 @@ export default function SignUpPage() {
 
     const supabase = createClient()
 
+    // Always use the real browser origin in production. Using a development
+    // redirect variable here can send customers to an invalid/old URL.
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-          `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        emailRedirectTo,
         data: {
           full_name: fullName,
         },
@@ -74,7 +76,6 @@ export default function SignUpPage() {
       } else if (error.message.toLowerCase().includes('password')) {
         setError('Senha muito fraca. Use pelo menos 6 caracteres.')
       } else {
-        // Mostra o erro real retornado pelo Supabase
         setError(error.message)
       }
 
