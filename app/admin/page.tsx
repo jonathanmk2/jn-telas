@@ -139,9 +139,9 @@ export default async function AdminPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
-          <AdminSidebar />
+          <AdminSidebar customers={customers} />
 
-          <div className="min-w-0">
+          <div className="min-w-0 lg:col-start-2 lg:row-start-1">
             <section id="admin-sales-summary" className="mb-8">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
