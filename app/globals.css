@@ -34,8 +34,6 @@
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
   --color-background: var(--background);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -43,6 +41,7 @@
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
@@ -106,6 +105,33 @@
 #planos > div > div {
   border-color: color-mix(in oklch, var(--primary) 55%, var(--border));
   box-shadow: 0 24px 70px color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+/* Animação discreta do rosto do mascote: olhos piscam em intervalos irregulares. */
+@keyframes ld-cloud-blink {
+  0%, 45%, 48%, 100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  46%, 47% {
+    transform: scaleY(0.08);
+    opacity: 0.85;
+  }
+}
+
+#planos [aria-label="Mascote LD Cloud"] .flex.items-center.gap-3 > span {
+  transform-origin: center;
+  animation: ld-cloud-blink 4.8s ease-in-out infinite;
+}
+
+#planos [aria-label="Mascote LD Cloud"] .flex.items-center.gap-3 > span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #planos [aria-label="Mascote LD Cloud"] .flex.items-center.gap-3 > span {
+    animation: none;
+  }
 }
 
 @media (min-width: 640px) {
