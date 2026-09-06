@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, ShieldCheck } from 'lucide-react'
+import { Clock, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { whatsappLink } from '@/lib/format'
 
@@ -34,9 +34,10 @@ export function Support() {
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#25D366] shadow-lg shadow-[#25D366]/10"><WhatsAppIcon className="size-7" /></div>
                   <div><p className="font-bold">WhatsApp</p><p className="text-sm text-muted-foreground">Resposta rápida no chat</p></div>
                 </div>
-                <Button asChild className="mt-4 h-11 w-full font-bold" size="lg">
-                  <a href={whatsappLink('Olá! Preciso de suporte com a JN TELAS.')} target="_blank" rel="noopener noreferrer">
-                    <WhatsAppIcon className="size-5" /> Falar pelo WhatsApp <ExternalLink className="ml-auto size-4" />
+                <Button asChild className="mt-4 h-11 w-full bg-[#25D366] font-bold text-white shadow-lg shadow-[#25D366]/20 transition-all hover:bg-[#20bd5a] hover:shadow-xl hover:shadow-[#25D366]/25" size="lg">
+                  <a href={whatsappLink('Olá! Preciso de suporte com a JN TELAS.')} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                    <WhatsAppIcon className="size-5" />
+                    Falar pelo WhatsApp
                   </a>
                 </Button>
               </div>
