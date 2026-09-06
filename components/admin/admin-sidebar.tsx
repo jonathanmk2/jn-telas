@@ -12,13 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 
-type AdminSection =
-  | 'overview'
-  | 'stock'
-  | 'sync'
-  | 'customers'
-  | 'orders'
-  | 'history'
+type AdminSection = 'overview' | 'stock' | 'sync' | 'customers' | 'orders' | 'history'
 
 type Customer = {
   id: string
@@ -29,11 +23,7 @@ type Customer = {
   orderCount: number
 }
 
-const items: Array<{
-  id: AdminSection
-  label: string
-  icon: typeof BarChart3
-}> = [
+const items: Array<{ id: AdminSection; label: string; icon: typeof BarChart3 }> = [
   { id: 'overview', label: 'Visão geral', icon: BarChart3 },
   { id: 'stock', label: 'Estoque e códigos', icon: Boxes },
   { id: 'sync', label: 'Sincronizar usados', icon: RefreshCw },
@@ -42,20 +32,13 @@ const items: Array<{
   { id: 'history', label: 'Histórico', icon: History },
 ]
 
-const sectionRules: Record<AdminSection, string[]> = {
-  overview: [],
-  stock: [
-    'Resumo do estoque',
-    'Adicionar códigos ao estoque',
-    'Códigos disponíveis',
-    'Códigos entregues',
-    'Gerenciar códigos',
-  ],
-  sync: [],
-  customers: ['Clientes'],
-  orders: ['Pedidos'],
-  history: [],
-}
+const stockTitles = [
+  'Resumo do estoque',
+  'Adicionar códigos ao estoque',
+  'Códigos disponíveis',
+  'Códigos entregues',
+  'Gerenciar códigos',
+]
 
 function getSectionTitle(element: HTMLElement) {
   return Array.from(element.querySelectorAll('h2'))
@@ -69,30 +52,17 @@ function findDeliveredSection(dashboard: HTMLElement) {
   ) as HTMLElement | undefined
 }
 
-function findSyncDirectChild(deliveredSection: HTMLElement) {
-  const syncHeading = Array.from(deliveredSection.querySelectorAll('h3')).find(
-    (element) =>
-      element.textContent?.trim().startsWith('Sincronizar códigos usados'),
+function findSyncContainer(deliveredSection: HTMLElement) {
+  const heading = Array.from(deliveredSection.querySelectorAll('h3')).find((element) =>
+    element.textContent?.trim().startsWith('Sincronizar códigos usados'),
   )
-
-  if (!syncHeading) return null
-
-  return Array.from(deliveredSection.children).find((child) =>
-    child.contains(syncHeading),
-  ) as HTMLElement | null
+  if (!heading) return null
+  return Array.from(deliveredSection.children).find((child) => child.contains(heading)) as HTMLElement | null
 }
 
-function ensureSyncCopyButton(
-  syncContainer: HTMLElement,
-  deliveredSection: HTMLElement,
-) {
-  let copyButton = document.getElementById(
-    'admin-sync-copy-delivered',
-  ) as HTMLButtonElement | null
-
-  const originalButton = Array.from(
-    deliveredSection.querySelectorAll('button'),
-  ).find((button) =>
+function ensureSyncCopyButton(syncContainer: HTMLElement, deliveredSection: HTMLElement) {
+  let copyButton = document.getElementById('admin-sync-copy-delivered') as HTMLButtonElement | null
+  const originalButton = Array.from(deliveredSection.querySelectorAll('button')).find((button) =>
     button.textContent?.trim().startsWith('Copiar todos entregues'),
   ) as HTMLButtonElement | undefined
 
@@ -108,9 +78,7 @@ function ensureSyncCopyButton(
     copyButton.type = 'button'
     copyButton.className = originalButton.className
     copyButton.textContent = 'Copiar todos os códigos entregues'
-    copyButton.addEventListener('click', () => {
-      originalButton.click()
-    })
+    copyButton.addEventListener('click', () => originalButton.click())
 
     wrapper.appendChild(copyButton)
     syncContainer.appendChild(wrapper)
@@ -125,15 +93,10 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
 
   const filteredCustomers = useMemo(() => {
     const search = customerSearch.trim().toLowerCase()
-
     if (!search) return customers
 
     return customers.filter((customer) =>
-      [
-        customer.full_name,
-        customer.email,
-        customer.id,
-      ]
+      [customer.full_name, customer.email, customer.id]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -146,32 +109,28 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
     const salesSummary = document.getElementById('admin-sales-summary')
     const auditLog = document.getElementById('admin-audit-log')
     const customerPanel = document.getElementById('admin-customers-panel')
+    const ordersPanel = document.getElementById('admin-orders-panel')
 
     if (!dashboard) return
 
-    const allowed = sectionRules[section]
-
     dashboard.querySelectorAll('section').forEach((element) => {
       const title = getSectionTitle(element)
+      const isOldOrdersSection = title.startsWith('Pedidos')
+      const isOldCustomersSection = title.startsWith('Clientes')
 
-      const shouldShow = section === 'stock'
-        ? allowed.some((name) => title.startsWith(name))
-        : section === 'customers'
-          ? false
-          : section === 'orders'
-            ? title.startsWith('Pedidos')
-            : false
+      let shouldShow = false
+      if (section === 'stock') shouldShow = stockTitles.some((name) => title.startsWith(name))
+      if (section === 'orders') shouldShow = isOldOrdersSection
 
+      if (isOldCustomersSection || isOldOrdersSection) shouldShow = false
       element.style.display = shouldShow ? '' : 'none'
     })
 
     const deliveredSection = findDeliveredSection(dashboard)
-    const syncContainer = deliveredSection
-      ? findSyncDirectChild(deliveredSection)
-      : null
+    const syncContainer = deliveredSection ? findSyncContainer(deliveredSection) : null
 
     if (deliveredSection) {
-      deliveredSection.style.display = section === 'stock' ? '' : 'none'
+      deliveredSection.style.display = section === 'stock' || section === 'sync' ? '' : 'none'
 
       Array.from(deliveredSection.children).forEach((child) => {
         child.style.display = ''
@@ -179,73 +138,25 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
     }
 
     if (syncContainer && deliveredSection) {
-      syncContainer.style.display = 'none'
+      syncContainer.style.display = section === 'sync' ? '' : 'none'
 
       if (section === 'sync') {
-        deliveredSection.style.display = ''
-
         Array.from(deliveredSection.children).forEach((child) => {
           child.style.display = child === syncContainer ? '' : 'none'
         })
-
         ensureSyncCopyButton(syncContainer, deliveredSection)
-      } else if (section === 'stock') {
-        Array.from(deliveredSection.children).forEach((child) => {
-          if (child !== syncContainer) {
-            child.style.display = ''
-          }
-        })
       }
     }
 
-    if (salesSummary) {
-      salesSummary.style.display = section === 'overview' ? '' : 'none'
-    }
-
-    if (auditLog) {
-      auditLog.style.display = section === 'history' ? '' : 'none'
-    }
-
-    if (customerPanel) {
-      customerPanel.style.display = section === 'customers' ? '' : 'none'
-    }
+    if (salesSummary) salesSummary.style.display = section === 'overview' ? '' : 'none'
+    if (auditLog) auditLog.style.display = section === 'history' ? '' : 'none'
+    if (customerPanel) customerPanel.style.display = section === 'customers' ? '' : 'none'
+    if (ordersPanel) ordersPanel.style.display = section === 'orders' ? '' : 'none'
   }
 
   useEffect(() => {
-    let attempts = 0
-    let timer: number | undefined
-
-    const applyWhenReady = () => {
-      const dashboard = document.getElementById('admin-dashboard-content')
-      const salesSummary = document.getElementById('admin-sales-summary')
-      const auditLog = document.getElementById('admin-audit-log')
-
-      if (!dashboard || !salesSummary || !auditLog) {
-        if (attempts < 20) {
-          attempts += 1
-          timer = window.setTimeout(applyWhenReady, 50)
-        }
-        return
-      }
-
-      applySection(active)
-    }
-
-    applyWhenReady()
-
-    const dashboard = document.getElementById('admin-dashboard-content')
-    if (!dashboard) return () => timer && window.clearTimeout(timer)
-
-    const observer = new MutationObserver(() => applySection(active))
-    observer.observe(dashboard, {
-      childList: true,
-      subtree: true,
-    })
-
-    return () => {
-      observer.disconnect()
-      if (timer) window.clearTimeout(timer)
-    }
+    const timer = window.setTimeout(() => applySection(active), 0)
+    return () => window.clearTimeout(timer)
   }, [active])
 
   return (
@@ -261,17 +172,12 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
             {items.map((item) => {
               const Icon = item.icon
               const isActive = active === item.id
-
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setActive(item.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                 >
                   <Icon className="size-4 shrink-0" />
                   <span>{item.label}</span>
@@ -282,24 +188,14 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
         </div>
       </aside>
 
-      <section
-        id="admin-customers-panel"
-        className="min-w-0 lg:col-start-2 lg:row-start-1"
-      >
+      <section id="admin-customers-panel" className="min-w-0 lg:col-start-2 lg:row-start-1">
         <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">
-                Clientes ({customers.length})
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Cadastros realizados no site.
-              </p>
+              <h2 className="text-lg font-semibold">Clientes ({customers.length})</h2>
+              <p className="text-sm text-muted-foreground">Cadastros realizados no site.</p>
             </div>
-
-            <div className="text-sm text-muted-foreground">
-              {filteredCustomers.length} encontrado(s)
-            </div>
+            <div className="text-sm text-muted-foreground">{filteredCustomers.length} encontrado(s)</div>
           </div>
 
           <div className="relative mt-4">
@@ -327,32 +223,15 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-8 text-center text-sm text-muted-foreground"
-                    >
-                      Nenhum cadastro encontrado.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum cadastro encontrado.</td></tr>
                 ) : (
                   filteredCustomers.map((customer) => (
                     <tr key={customer.id} className="border-t">
-                      <td className="px-4 py-3 font-medium">
-                        {customer.full_name ?? 'Nome não informado'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {customer.email ?? '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {customer.codeCount}
-                      </td>
-                      <td className="px-4 py-3">
-                        {customer.orderCount}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(customer.created_at).toLocaleDateString('pt-BR')}
-                      </td>
+                      <td className="px-4 py-3 font-medium">{customer.full_name ?? 'Nome não informado'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{customer.email ?? '—'}</td>
+                      <td className="px-4 py-3">{customer.codeCount}</td>
+                      <td className="px-4 py-3">{customer.orderCount}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(customer.created_at).toLocaleDateString('pt-BR')}</td>
                     </tr>
                   ))
                 )}
