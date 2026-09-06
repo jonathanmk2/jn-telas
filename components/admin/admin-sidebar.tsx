@@ -41,7 +41,7 @@ const sectionRules: Record<AdminSection, string[]> = {
     'Códigos entregues',
     'Gerenciar códigos',
   ],
-  sync: ['Códigos entregues'],
+  sync: [],
   customers: ['Clientes'],
   orders: ['Pedidos'],
   history: [],
@@ -67,13 +67,11 @@ function applySection(section: AdminSection) {
 
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
-      : section === 'sync'
-        ? title.startsWith('Códigos entregues')
-        : section === 'customers'
-          ? title.startsWith('Clientes')
-          : section === 'orders'
-            ? title.startsWith('Pedidos')
-            : false
+      : section === 'sync' || section === 'customers'
+        ? false
+        : section === 'orders'
+          ? title.startsWith('Pedidos')
+          : false
 
     element.style.display = shouldShow ? '' : 'none'
   })
@@ -97,7 +95,10 @@ function applySection(section: AdminSection) {
         element.textContent?.trim().startsWith('Sincronizar códigos usados'),
       )
 
-      const syncPanel = syncHeading?.closest('div.rounded-xl')
+      // O painel de sincronização é o bloco externo que contém o h3.
+      // Não usamos closest('div.rounded-xl') porque existem outros
+      // containers arredondados dentro da própria seção.
+      const syncPanel = syncHeading?.parentElement?.parentElement
 
       if (syncPanel) {
         Array.from(deliveredSection.children).forEach((child) => {
