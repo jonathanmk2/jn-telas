@@ -284,7 +284,7 @@ export function AdminSidebar({ customers }: { customers: Customer[] }) {
 
       <section
         id="admin-customers-panel"
-        className="hidden min-w-0 lg:col-start-2 lg:row-start-1"
+        className="min-w-0 lg:col-start-2 lg:row-start-1"
       >
         <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
