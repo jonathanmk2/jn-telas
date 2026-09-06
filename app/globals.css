@@ -83,10 +83,19 @@
 }
 
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  }
   html { scroll-behavior: smooth; }
-  body { @apply bg-background text-foreground; }
-  ::selection { background: color-mix(in oklch, var(--primary) 35%, transparent); color: var(--foreground); }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
+    color: var(--foreground);
+  }
 }
 
 /* Refinos visuais da área de compra sem alterar a lógica de pagamento. */
