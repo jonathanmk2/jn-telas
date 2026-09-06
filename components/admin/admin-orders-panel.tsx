@@ -104,7 +104,7 @@ export function AdminOrdersPanel({ orders }: { orders: Order[] }) {
   }
 
   return (
-    <section id="admin-orders-panel" className="hidden min-w-0 lg:col-start-2 lg:row-start-1">
+    <section id="admin-orders-panel" className="min-w-0 lg:col-start-2 lg:row-start-1">
       <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
