@@ -52,8 +52,13 @@ function applySection(section: AdminSection) {
 
   const allowed = sectionRules[section]
 
-  dashboard.querySelectorAll(':scope > section').forEach((element) => {
-    const title = element.querySelector('h2')?.textContent?.trim() ?? ''
+  // Use inline display instead of the hidden attribute so the selected
+  // section cannot be overridden by global/component CSS rules.
+  Array.from(dashboard.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) return
+    if (child.tagName !== 'SECTION') return
+
+    const title = child.querySelector('h2')?.textContent?.trim() ?? ''
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
       : section === 'customers'
@@ -62,15 +67,15 @@ function applySection(section: AdminSection) {
           ? title.startsWith('Pedidos')
           : false
 
-    element.toggleAttribute('hidden', !shouldShow)
+    child.style.display = shouldShow ? '' : 'none'
   })
 
   if (salesSummary) {
-    salesSummary.toggleAttribute('hidden', section !== 'overview')
+    salesSummary.style.display = section === 'overview' ? '' : 'none'
   }
 
   if (auditLog) {
-    auditLog.toggleAttribute('hidden', section !== 'overview' && section !== 'history')
+    auditLog.style.display = section === 'overview' || section === 'history' ? '' : 'none'
   }
 }
 
@@ -78,18 +83,39 @@ export function AdminSidebar() {
   const [active, setActive] = useState<AdminSection>('overview')
 
   useEffect(() => {
-    applySection(active)
+    let attempts = 0
+    let timer: number | undefined
+
+    const applyWhenReady = () => {
+      const dashboard = document.getElementById('admin-dashboard-content')
+      const salesSummary = document.getElementById('admin-sales-summary')
+
+      if (!dashboard || !salesSummary) {
+        if (attempts < 20) {
+          attempts += 1
+          timer = window.setTimeout(applyWhenReady, 50)
+        }
+        return
+      }
+
+      applySection(active)
+    }
+
+    applyWhenReady()
 
     const dashboard = document.getElementById('admin-dashboard-content')
-    if (!dashboard) return
+    if (!dashboard) return () => timer && window.clearTimeout(timer)
 
     const observer = new MutationObserver(() => applySection(active))
-    observer.observe(dashboard.parentElement ?? dashboard, {
+    observer.observe(dashboard, {
       childList: true,
       subtree: true,
     })
 
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (timer) window.clearTimeout(timer)
+    }
   }, [active])
 
   return (
