@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart3,
   Boxes,
   History,
   Menu,
   RefreshCw,
+  Search,
   ShoppingBag,
   Users,
 } from 'lucide-react'
@@ -18,6 +19,15 @@ type AdminSection =
   | 'customers'
   | 'orders'
   | 'history'
+
+type Customer = {
+  id: string
+  email: string | null
+  full_name: string | null
+  created_at: string
+  codeCount: number
+  orderCount: number
+}
 
 const items: Array<{
   id: AdminSection
@@ -109,73 +119,97 @@ function ensureSyncCopyButton(
   copyButton.disabled = originalButton.disabled
 }
 
-function applySection(section: AdminSection) {
-  const dashboard = document.getElementById('admin-dashboard-content')
-  const salesSummary = document.getElementById('admin-sales-summary')
-  const auditLog = document.getElementById('admin-audit-log')
+export function AdminSidebar({ customers }: { customers: Customer[] }) {
+  const [active, setActive] = useState<AdminSection>('overview')
+  const [customerSearch, setCustomerSearch] = useState('')
 
-  if (!dashboard) return
+  const filteredCustomers = useMemo(() => {
+    const search = customerSearch.trim().toLowerCase()
 
-  const allowed = sectionRules[section]
+    if (!search) return customers
 
-  dashboard.querySelectorAll('section').forEach((element) => {
-    const title = getSectionTitle(element)
+    return customers.filter((customer) =>
+      [
+        customer.full_name,
+        customer.email,
+        customer.id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(search),
+    )
+  }, [customers, customerSearch])
 
-    const shouldShow = section === 'stock'
-      ? allowed.some((name) => title.startsWith(name))
-      : section === 'customers'
-        ? title.startsWith('Clientes')
-        : section === 'orders'
-          ? title.startsWith('Pedidos')
-          : false
+  function applySection(section: AdminSection) {
+    const dashboard = document.getElementById('admin-dashboard-content')
+    const salesSummary = document.getElementById('admin-sales-summary')
+    const auditLog = document.getElementById('admin-audit-log')
+    const customerPanel = document.getElementById('admin-customers-panel')
 
-    element.style.display = shouldShow ? '' : 'none'
-  })
+    if (!dashboard) return
 
-  const deliveredSection = findDeliveredSection(dashboard)
-  const syncContainer = deliveredSection
-    ? findSyncDirectChild(deliveredSection)
-    : null
+    const allowed = sectionRules[section]
 
-  if (deliveredSection) {
-    deliveredSection.style.display = section === 'stock' ? '' : 'none'
+    dashboard.querySelectorAll('section').forEach((element) => {
+      const title = getSectionTitle(element)
 
-    Array.from(deliveredSection.children).forEach((child) => {
-      child.style.display = ''
+      const shouldShow = section === 'stock'
+        ? allowed.some((name) => title.startsWith(name))
+        : section === 'customers'
+          ? false
+          : section === 'orders'
+            ? title.startsWith('Pedidos')
+            : false
+
+      element.style.display = shouldShow ? '' : 'none'
     })
-  }
 
-  if (syncContainer && deliveredSection) {
-    syncContainer.style.display = 'none'
+    const deliveredSection = findDeliveredSection(dashboard)
+    const syncContainer = deliveredSection
+      ? findSyncDirectChild(deliveredSection)
+      : null
 
-    if (section === 'sync') {
-      deliveredSection.style.display = ''
+    if (deliveredSection) {
+      deliveredSection.style.display = section === 'stock' ? '' : 'none'
 
       Array.from(deliveredSection.children).forEach((child) => {
-        child.style.display = child === syncContainer ? '' : 'none'
-      })
-
-      ensureSyncCopyButton(syncContainer, deliveredSection)
-    } else if (section === 'stock') {
-      Array.from(deliveredSection.children).forEach((child) => {
-        if (child !== syncContainer) {
-          child.style.display = ''
-        }
+        child.style.display = ''
       })
     }
-  }
 
-  if (salesSummary) {
-    salesSummary.style.display = section === 'overview' ? '' : 'none'
-  }
+    if (syncContainer && deliveredSection) {
+      syncContainer.style.display = 'none'
 
-  if (auditLog) {
-    auditLog.style.display = section === 'history' ? '' : 'none'
-  }
-}
+      if (section === 'sync') {
+        deliveredSection.style.display = ''
 
-export function AdminSidebar() {
-  const [active, setActive] = useState<AdminSection>('overview')
+        Array.from(deliveredSection.children).forEach((child) => {
+          child.style.display = child === syncContainer ? '' : 'none'
+        })
+
+        ensureSyncCopyButton(syncContainer, deliveredSection)
+      } else if (section === 'stock') {
+        Array.from(deliveredSection.children).forEach((child) => {
+          if (child !== syncContainer) {
+            child.style.display = ''
+          }
+        })
+      }
+    }
+
+    if (salesSummary) {
+      salesSummary.style.display = section === 'overview' ? '' : 'none'
+    }
+
+    if (auditLog) {
+      auditLog.style.display = section === 'history' ? '' : 'none'
+    }
+
+    if (customerPanel) {
+      customerPanel.style.display = section === 'customers' ? '' : 'none'
+    }
+  }
 
   useEffect(() => {
     let attempts = 0
@@ -215,36 +249,118 @@ export function AdminSidebar() {
   }, [active])
 
   return (
-    <aside className="h-fit lg:sticky lg:top-24">
-      <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-sm">
-        <div className="flex items-center gap-2 px-3 py-3 text-sm font-semibold">
-          <Menu className="size-4 text-primary" />
-          Menu administrativo
+    <div className="contents">
+      <aside className="h-fit lg:sticky lg:top-24">
+        <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-sm">
+          <div className="flex items-center gap-2 px-3 py-3 text-sm font-semibold">
+            <Menu className="size-4 text-primary" />
+            Menu administrativo
+          </div>
+
+          <nav className="grid gap-1" aria-label="Menu administrativo">
+            {items.map((item) => {
+              const Icon = item.icon
+              const isActive = active === item.id
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActive(item.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              )
+            })}
+          </nav>
         </div>
+      </aside>
 
-        <nav className="grid gap-1" aria-label="Menu administrativo">
-          {items.map((item) => {
-            const Icon = item.icon
-            const isActive = active === item.id
+      <section
+        id="admin-customers-panel"
+        className="hidden min-w-0 lg:col-start-2 lg:row-start-1"
+      >
+        <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Clientes ({customers.length})
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Cadastros realizados no site.
+              </p>
+            </div>
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActive(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <Icon className="size-4 shrink-0" />
-                <span>{item.label}</span>
-              </button>
-            )
-          })}
-        </nav>
-      </div>
-    </aside>
+            <div className="text-sm text-muted-foreground">
+              {filteredCustomers.length} encontrado(s)
+            </div>
+          </div>
+
+          <div className="relative mt-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={customerSearch}
+              onChange={(event) => setCustomerSearch(event.target.value)}
+              placeholder="Buscar por nome ou e-mail..."
+              aria-label="Buscar clientes por nome ou e-mail"
+              className="h-11 w-full rounded-lg border bg-background pl-10 pr-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-xl border border-border/60">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-left text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">E-mail</th>
+                  <th className="px-4 py-3">Códigos</th>
+                  <th className="px-4 py-3">Pedidos</th>
+                  <th className="px-4 py-3">Cadastro</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-sm text-muted-foreground"
+                    >
+                      Nenhum cadastro encontrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map((customer) => (
+                    <tr key={customer.id} className="border-t">
+                      <td className="px-4 py-3 font-medium">
+                        {customer.full_name ?? 'Nome não informado'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {customer.email ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {customer.codeCount}
+                      </td>
+                      <td className="px-4 py-3">
+                        {customer.orderCount}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {new Date(customer.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
   )
 }
