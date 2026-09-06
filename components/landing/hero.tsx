@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ShieldCheck, Zap, Headphones, MonitorSmartphone, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ShieldCheck, Zap, Headphones, MonitorSmartphone, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function Hero() {
@@ -28,14 +28,15 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button asChild size="lg" className="h-12 w-full px-7 text-sm font-bold shadow-lg shadow-primary/20 sm:w-auto">
-              <Link href="#planos">
+            <Button asChild size="lg" className="h-12 w-full px-8 text-sm font-bold shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 sm:w-auto">
+              <Link href="#planos" className="flex w-full items-center justify-center">
                 Comprar agora
-                <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 w-full px-7 sm:w-auto">
-              <Link href="#beneficios">Como funciona</Link>
+            <Button asChild size="lg" variant="outline" className="h-12 w-full px-8 transition-all hover:-translate-y-0.5 sm:w-auto">
+              <Link href="#beneficios" className="flex w-full items-center justify-center">
+                Como funciona
+              </Link>
             </Button>
           </div>
 
