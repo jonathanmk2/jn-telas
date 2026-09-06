@@ -53,6 +53,58 @@ function getSectionTitle(element: HTMLElement) {
     .find(Boolean) ?? ''
 }
 
+function findDeliveredSection(dashboard: HTMLElement) {
+  return Array.from(dashboard.querySelectorAll('section')).find((element) =>
+    getSectionTitle(element).startsWith('Códigos entregues'),
+  ) as HTMLElement | undefined
+}
+
+function findSyncPanel(deliveredSection: HTMLElement) {
+  const syncHeading = Array.from(deliveredSection.querySelectorAll('h3')).find(
+    (element) =>
+      element.textContent?.trim().startsWith('Sincronizar códigos usados'),
+  )
+
+  return syncHeading?.parentElement?.parentElement as HTMLElement | null
+}
+
+function ensureSyncCopyButton(
+  syncPanel: HTMLElement,
+  deliveredSection: HTMLElement,
+) {
+  let copyButton = document.getElementById(
+    'admin-sync-copy-delivered',
+  ) as HTMLButtonElement | null
+
+  const originalButton = Array.from(
+    deliveredSection.querySelectorAll('button'),
+  ).find((button) =>
+    button.textContent?.trim().startsWith('Copiar todos entregues'),
+  ) as HTMLButtonElement | undefined
+
+  if (!originalButton) return
+
+  if (!copyButton) {
+    const wrapper = document.createElement('div')
+    wrapper.id = 'admin-sync-copy-delivered-wrapper'
+    wrapper.className = 'mt-4 flex justify-end'
+
+    copyButton = document.createElement('button')
+    copyButton.id = 'admin-sync-copy-delivered'
+    copyButton.type = 'button'
+    copyButton.className = originalButton.className
+    copyButton.textContent = 'Copiar todos os códigos entregues'
+    copyButton.addEventListener('click', () => {
+      originalButton.click()
+    })
+
+    wrapper.appendChild(copyButton)
+    syncPanel.appendChild(wrapper)
+  }
+
+  copyButton.disabled = originalButton.disabled
+}
+
 function applySection(section: AdminSection) {
   const dashboard = document.getElementById('admin-dashboard-content')
   const salesSummary = document.getElementById('admin-sales-summary')
@@ -67,44 +119,33 @@ function applySection(section: AdminSection) {
 
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
-      : section === 'sync' || section === 'customers'
-        ? false
-        : section === 'orders'
-          ? title.startsWith('Pedidos')
-          : false
+      : section === 'orders'
+        ? title.startsWith('Pedidos')
+        : false
 
     element.style.display = shouldShow ? '' : 'none'
   })
 
-  const deliveredSection = Array.from(
-    dashboard.querySelectorAll('section'),
-  ).find((element) => {
-    const title = getSectionTitle(element)
-    return title.startsWith('Códigos entregues')
-  })
+  const deliveredSection = findDeliveredSection(dashboard)
+  const syncPanel = deliveredSection
+    ? findSyncPanel(deliveredSection)
+    : null
 
   if (deliveredSection) {
     Array.from(deliveredSection.children).forEach((child) => {
       child.style.display = ''
     })
+  }
 
-    if (section === 'sync') {
-      const syncHeading = Array.from(
-        deliveredSection.querySelectorAll('h3'),
-      ).find((element) =>
-        element.textContent?.trim().startsWith('Sincronizar códigos usados'),
-      )
+  if (syncPanel) {
+    syncPanel.style.display = section === 'sync' ? '' : 'none'
 
-      // O painel de sincronização é o bloco externo que contém o h3.
-      // Não usamos closest('div.rounded-xl') porque existem outros
-      // containers arredondados dentro da própria seção.
-      const syncPanel = syncHeading?.parentElement?.parentElement
+    if (section === 'sync' && deliveredSection) {
+      Array.from(deliveredSection.children).forEach((child) => {
+        child.style.display = child === syncPanel ? '' : 'none'
+      })
 
-      if (syncPanel) {
-        Array.from(deliveredSection.children).forEach((child) => {
-          child.style.display = child === syncPanel ? '' : 'none'
-        })
-      }
+      ensureSyncCopyButton(syncPanel, deliveredSection)
     }
   }
 
