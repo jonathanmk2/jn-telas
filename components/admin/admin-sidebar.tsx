@@ -59,17 +59,21 @@ function findDeliveredSection(dashboard: HTMLElement) {
   ) as HTMLElement | undefined
 }
 
-function findSyncPanel(deliveredSection: HTMLElement) {
+function findSyncDirectChild(deliveredSection: HTMLElement) {
   const syncHeading = Array.from(deliveredSection.querySelectorAll('h3')).find(
     (element) =>
       element.textContent?.trim().startsWith('Sincronizar códigos usados'),
   )
 
-  return syncHeading?.parentElement?.parentElement as HTMLElement | null
+  if (!syncHeading) return null
+
+  return Array.from(deliveredSection.children).find((child) =>
+    child.contains(syncHeading),
+  ) as HTMLElement | null
 }
 
 function ensureSyncCopyButton(
-  syncPanel: HTMLElement,
+  syncContainer: HTMLElement,
   deliveredSection: HTMLElement,
 ) {
   let copyButton = document.getElementById(
@@ -99,7 +103,7 @@ function ensureSyncCopyButton(
     })
 
     wrapper.appendChild(copyButton)
-    syncPanel.appendChild(wrapper)
+    syncContainer.appendChild(wrapper)
   }
 
   copyButton.disabled = originalButton.disabled
@@ -119,33 +123,39 @@ function applySection(section: AdminSection) {
 
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
-      : section === 'orders'
-        ? title.startsWith('Pedidos')
-        : false
+      : section === 'customers'
+        ? title.startsWith('Clientes')
+        : section === 'orders'
+          ? title.startsWith('Pedidos')
+          : false
 
     element.style.display = shouldShow ? '' : 'none'
   })
 
   const deliveredSection = findDeliveredSection(dashboard)
-  const syncPanel = deliveredSection
-    ? findSyncPanel(deliveredSection)
+  const syncContainer = deliveredSection
+    ? findSyncDirectChild(deliveredSection)
     : null
 
   if (deliveredSection) {
+    deliveredSection.style.display = section === 'stock' ? '' : 'none'
+
     Array.from(deliveredSection.children).forEach((child) => {
       child.style.display = ''
     })
   }
 
-  if (syncPanel) {
-    syncPanel.style.display = section === 'sync' ? '' : 'none'
+  if (syncContainer && deliveredSection) {
+    if (section === 'sync') {
+      deliveredSection.style.display = ''
 
-    if (section === 'sync' && deliveredSection) {
       Array.from(deliveredSection.children).forEach((child) => {
-        child.style.display = child === syncPanel ? '' : 'none'
+        child.style.display = child === syncContainer ? '' : 'none'
       })
 
-      ensureSyncCopyButton(syncPanel, deliveredSection)
+      ensureSyncCopyButton(syncContainer, deliveredSection)
+    } else {
+      syncContainer.style.display = section === 'stock' ? '' : 'none'
     }
   }
 
