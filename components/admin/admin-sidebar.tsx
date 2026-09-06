@@ -6,6 +6,7 @@ import {
   Boxes,
   History,
   Menu,
+  RefreshCw,
   ShoppingBag,
   Users,
 } from 'lucide-react'
@@ -13,6 +14,7 @@ import {
 type AdminSection =
   | 'overview'
   | 'stock'
+  | 'sync'
   | 'customers'
   | 'orders'
   | 'history'
@@ -24,6 +26,7 @@ const items: Array<{
 }> = [
   { id: 'overview', label: 'Visão geral', icon: BarChart3 },
   { id: 'stock', label: 'Estoque e códigos', icon: Boxes },
+  { id: 'sync', label: 'Sincronizar usados', icon: RefreshCw },
   { id: 'customers', label: 'Clientes', icon: Users },
   { id: 'orders', label: 'Pedidos', icon: ShoppingBag },
   { id: 'history', label: 'Histórico', icon: History },
@@ -38,6 +41,7 @@ const sectionRules: Record<AdminSection, string[]> = {
     'Códigos entregues',
     'Gerenciar códigos',
   ],
+  sync: ['Códigos entregues'],
   customers: ['Clientes'],
   orders: ['Pedidos'],
   history: [],
@@ -52,27 +56,52 @@ function applySection(section: AdminSection) {
 
   const allowed = sectionRules[section]
 
-  // O dashboard possui um wrapper interno, então procuramos todas as seções.
   dashboard.querySelectorAll('section').forEach((element) => {
     const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
 
     const shouldShow = section === 'stock'
       ? allowed.some((name) => title.startsWith(name))
-      : section === 'customers'
-        ? title.startsWith('Clientes')
-        : section === 'orders'
-          ? title.startsWith('Pedidos')
-          : false
+      : section === 'sync'
+        ? title.startsWith('Códigos entregues')
+        : section === 'customers'
+          ? title.startsWith('Clientes')
+          : section === 'orders'
+            ? title.startsWith('Pedidos')
+            : false
 
     element.style.display = shouldShow ? '' : 'none'
   })
 
-  // A visão geral mostra somente o resumo de vendas.
+  const deliveredSection = Array.from(dashboard.querySelectorAll('section')).find(
+    (element) => {
+      const title = element.querySelector(':scope > h2')?.textContent?.trim() ?? ''
+      return title.startsWith('Códigos entregues')
+    },
+  )
+
+  if (deliveredSection) {
+    Array.from(deliveredSection.children).forEach((child) => {
+      child.style.display = ''
+    })
+
+    if (section === 'sync') {
+      const syncHeading = Array.from(deliveredSection.querySelectorAll('h3')).find(
+        (element) => element.textContent?.trim().startsWith('Sincronizar códigos usados'),
+      )
+      const syncPanel = syncHeading?.parentElement?.parentElement
+
+      if (syncPanel) {
+        Array.from(deliveredSection.children).forEach((child) => {
+          child.style.display = child === syncPanel ? '' : 'none'
+        })
+      }
+    }
+  }
+
   if (salesSummary) {
     salesSummary.style.display = section === 'overview' ? '' : 'none'
   }
 
-  // O histórico administrativo aparece exclusivamente na aba Histórico.
   if (auditLog) {
     auditLog.style.display = section === 'history' ? '' : 'none'
   }
