@@ -146,6 +146,8 @@ function applySection(section: AdminSection) {
   }
 
   if (syncContainer && deliveredSection) {
+    syncContainer.style.display = 'none'
+
     if (section === 'sync') {
       deliveredSection.style.display = ''
 
@@ -154,8 +156,12 @@ function applySection(section: AdminSection) {
       })
 
       ensureSyncCopyButton(syncContainer, deliveredSection)
-    } else {
-      syncContainer.style.display = section === 'stock' ? '' : 'none'
+    } else if (section === 'stock') {
+      Array.from(deliveredSection.children).forEach((child) => {
+        if (child !== syncContainer) {
+          child.style.display = ''
+        }
+      })
     }
   }
 
