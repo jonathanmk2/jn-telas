@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, CheckCircle2, Copy, Loader2, MessageCircle, Minus, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { formatBRL } from '@/lib/format'
+import { formatBRL, whatsappLink } from '@/lib/format'
 import { toast } from 'sonner'
 
 export type Product = { id: string; name: string; screens: number; price_cents: number; description: string | null }
@@ -181,7 +181,18 @@ export function Pricing({ products, isLoggedIn }: { products: Product[]; isLogge
             <Button className="mt-2 h-9 w-full text-sm" onClick={handleBuy} disabled={pending || !product || !inputIsValid}>{pending ? <><Loader2 className="size-4 animate-spin" />Processando...</> : <>Comprar {inputIsValid ? quantity : '—'} {inputIsValid && quantity === 1 ? 'tela' : 'telas'}</>}</Button>
             {pendingPaymentMessage && <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center"><p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Pagamento pendente</p><p className="mt-1 text-[10px] text-muted-foreground">{pendingPaymentMessage}</p><Button type="button" variant="outline" className="mt-2 h-9 w-full text-xs" onClick={() => router.push('/minha-conta')}>Ver pagamento pendente</Button></div>}
             {rateLimitMessage && <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-center text-xs text-destructive">{rateLimitMessage}</div>}
-            {stockMessage && <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center text-xs text-yellow-700 dark:text-yellow-300">{stockMessage}</div>}
+            {stockMessage && <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center text-xs text-yellow-700 dark:text-yellow-300">
+              <p>{stockMessage}</p>
+              <a
+                href={whatsappLink('Olá! Vi que o estoque da JN TELAS está insuficiente e gostaria de saber quando haverá disponibilidade.')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#25D366]/20 transition-transform hover:scale-[1.01]"
+              >
+                <MessageCircle className="size-5" />
+                Entrar em contato pelo WhatsApp
+              </a>
+            </div>}
           </div>}
         </div>
       </section>
