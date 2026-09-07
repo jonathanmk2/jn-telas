@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   description:
     'JN TELAS é uma plataforma independente para compra e acompanhamento de soluções por telas virtuais, com planos, códigos e suporte.',
   generator: 'v0.app',
+  icons: {
+    icon: '/jn-telas-logo.svg',
+    shortcut: '/jn-telas-logo.svg',
+    apple: '/jn-telas-logo.svg',
+  },
 }
 
 export const viewport: Viewport = {
