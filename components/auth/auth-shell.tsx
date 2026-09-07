@@ -7,15 +7,17 @@ export function AuthShell({
   children,
   footer,
   className = '',
+  outerClassName = '',
 }: {
   title: string
   subtitle?: string
   children: React.ReactNode
   footer?: React.ReactNode
   className?: string
+  outerClassName?: string
 }) {
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-10">
+    <div className={`relative flex min-h-dvh flex-col items-center justify-center px-4 py-10 ${outerClassName}`}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_0%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent)]"
