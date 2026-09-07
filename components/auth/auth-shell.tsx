@@ -6,11 +6,13 @@ export function AuthShell({
   subtitle,
   children,
   footer,
+  className = '',
 }: {
   title: string
   subtitle?: string
   children: React.ReactNode
   footer?: React.ReactNode
+  className?: string
 }) {
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-10">
@@ -18,7 +20,7 @@ export function AuthShell({
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_0%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent)]"
       />
-      <div className="relative w-full max-w-sm">
+      <div className={`relative w-full ${className || 'max-w-sm'}`}>
         <div className="mb-8 flex justify-center">
           <Link href="/" aria-label="Voltar à página inicial">
             <Logo />
