@@ -26,7 +26,10 @@ export default function SignUpSuccessPage() {
           role="alert"
         >
           <div className="flex flex-col items-center gap-2.5 border-b border-amber-400/20 px-4 py-4 text-center sm:gap-3 sm:px-5 sm:py-5">
-            <TriangleAlert className="size-11 shrink-0 animate-[pulse_1.1s_ease-in-out_infinite] text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,1)] sm:size-14" />
+            <div className="relative flex items-center justify-center">
+              <span className="absolute size-14 animate-ping rounded-full bg-amber-400/25 sm:size-[4.5rem]" />
+              <TriangleAlert className="relative size-11 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.95)] sm:size-14" />
+            </div>
             <p className="text-base font-extrabold tracking-wide text-amber-300 sm:text-lg">NÃO RECEBEU O E-MAIL?</p>
             <p className="text-sm leading-6 text-foreground sm:text-base sm:leading-7">
               Verifique sua <strong>Caixa de Spam / Lixo Eletrônico</strong>. O e-mail de confirmação pode estar lá.
