@@ -22,22 +22,14 @@ export default function SignUpSuccessPage() {
           role="alert"
         >
           <div className="flex gap-3">
-            <TriangleAlert className="mt-0.5 size-6 shrink-0 text-amber-400" />
-            <div className="space-y-2">
-              <p className="font-bold text-amber-300">🚨 AVISO IMPORTANTE</p>
+            <TriangleAlert className="mt-0.5 size-6 shrink-0 animate-pulse text-amber-400" />
+            <div className="space-y-1.5">
+              <p className="font-bold text-amber-300">⚠️ NÃO RECEBEU O E-MAIL?</p>
               <p className="text-sm leading-relaxed text-foreground">
-                📧 <strong>NÃO RECEBEU O E-MAIL DE CONFIRMAÇÃO?</strong>
+                Verifique também sua <strong>Caixa de Spam / Lixo Eletrônico</strong>. O e-mail de confirmação pode ser direcionado para lá automaticamente.
               </p>
               <p className="text-sm leading-relaxed text-foreground">
-                Verifique também a sua <strong>CAIXA DE SPAM / LIXO ELETRÔNICO</strong>.
-              </p>
-              <p className="text-sm leading-relaxed text-foreground">
-                O e-mail pode ser direcionado para lá automaticamente.{' '}
-                <strong>Procure por “JN TELAS”</strong> e marque como <strong>“Não é spam”</strong> para
-                receber nossos próximos e-mails normalmente.
-              </p>
-              <p className="text-sm font-semibold leading-relaxed text-amber-200">
-                ⚠️ Sem confirmar seu e-mail, sua conta não poderá ser ativada.
+                Procure por <strong>“JN TELAS”</strong> e, se estiver no spam, marque como <strong>“Não é spam”</strong>.
               </p>
             </div>
           </div>
