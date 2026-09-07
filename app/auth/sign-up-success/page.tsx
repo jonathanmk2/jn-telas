@@ -24,7 +24,7 @@ export default function SignUpSuccessPage() {
           <div className="flex gap-3">
             <TriangleAlert className="mt-0.5 size-6 shrink-0 animate-pulse text-amber-400" />
             <div className="space-y-1.5">
-              <p className="font-bold text-amber-300">⚠️ NÃO RECEBEU O E-MAIL?</p>
+              <p className="font-bold text-amber-300">NÃO RECEBEU O E-MAIL?</p>
               <p className="text-sm leading-relaxed text-foreground">
                 Verifique também sua <strong>Caixa de Spam / Lixo Eletrônico</strong>. O e-mail de confirmação pode ser direcionado para lá automaticamente.
               </p>
