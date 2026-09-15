@@ -8,7 +8,7 @@ const ORDER_EXPIRATION_MINUTES = 30
 
 type Platform = 'ldcloud' | 'vsphone'
 function unitPrice(platform: Platform, quantity: number) {
-  if (platform === 'vsphone') return quantity >= 10 ? 2200 : quantity >= 5 ? 2300 : 100
+  if (platform === 'vsphone') return quantity >= 10 ? 2200 : quantity >= 5 ? 2300 : 2400
   return quantity >= 10 ? 3300 : quantity >= 5 ? 3400 : 3500
 }
 
