@@ -11,7 +11,7 @@ import type { Product } from '@/components/landing/pricing'
 function unitPrice(quantity: number) {
   if (quantity >= 10) return 2200
   if (quantity >= 5) return 2300
-  return 2400
+  return 100
 }
 
 export function VsPhonePricing({ products, isLoggedIn }: { products: Product[]; isLoggedIn: boolean }) {
@@ -82,7 +82,7 @@ export function VsPhonePricing({ products, isLoggedIn }: { products: Product[]; 
           </div>
 
           <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]">
-            <div className={quantity < 5 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>1–4</div><div>R$ 24</div></div>
+            <div className={quantity < 5 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>1–4</div><div>R$ 1 TESTE</div></div>
             <div className={quantity >= 5 && quantity < 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>5–9</div><div>R$ 23</div></div>
             <div className={quantity >= 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>10+</div><div>R$ 22</div></div>
           </div>
