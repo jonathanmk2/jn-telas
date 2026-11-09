@@ -11,10 +11,8 @@ export type Product = { id: string; name: string; screens: number; price_cents: 
 type PaymentData = { orderId: string; qrCode: string | null; qrCodeBase64: string | null }
 type OrderStatus = 'pending' | 'paid' | 'delivered' | 'cancelled' | 'unknown'
 
-function getUnitPriceCents(quantity: number): number {
-  if (quantity >= 10) return 3300
-  if (quantity >= 5) return 3400
-  return 3500
+function getUnitPriceCents(_quantity: number): number {
+  return 3800
 }
 
 function isValidQuantityInput(value: string): boolean {
@@ -57,9 +55,27 @@ export function Pricing({ products, isLoggedIn }: { products: Product[]; isLogge
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null)
   const [stockMessage, setStockMessage] = useState<string | null>(null)
   const [pendingPaymentMessage, setPendingPaymentMessage] = useState<string | null>(null)
+  const [availableStock, setAvailableStock] = useState<number | null>(null)
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const product = products.find((item) => item.screens === 1) ?? products[0] ?? null
+
+  useEffect(() => {
+    let active = true
+    async function loadStock() {
+      try {
+        const response = await fetch('/api/stock?platform=ldcloud', { cache: 'no-store' })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active && Number.isInteger(data.available)) setAvailableStock(data.available)
+      } catch (error) {
+        console.error('Não foi possível consultar o estoque:', error)
+      }
+    }
+    loadStock()
+    const interval = window.setInterval(loadStock, 15000)
+    return () => { active = false; window.clearInterval(interval) }
+  }, [])
   const inputIsValid = isValidQuantityInput(quantityInput)
   const unitPriceCents = getUnitPriceCents(quantity)
   const totalCents = quantity * unitPriceCents
@@ -175,8 +191,9 @@ export function Pricing({ products, isLoggedIn }: { products: Product[]; isLogge
               <input type="text" inputMode="numeric" value={quantityInput} disabled={pending} onChange={(event) => { const value = event.target.value; setQuantityInput(value); if (isValidQuantityInput(value)) { setQuantity(Number(value)); idempotencyKeyRef.current = null; setRateLimitMessage(null); setStockMessage(null); setPendingPaymentMessage(null) } }} className={`h-9 w-full rounded-lg border bg-background px-2 text-center text-base font-bold outline-none ${!inputIsValid ? 'border-red-500' : ''}`} aria-label="Quantidade de telas" autoComplete="off" />
               <Button type="button" variant="outline" size="icon" className="size-9 shrink-0" onClick={() => changeQuantity(quantity + 1)} disabled={pending || quantity >= 500}><Plus className="size-4" /></Button>
             </div></div>
-            <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border bg-secondary/40 p-2 text-center text-[10px]"><div className={quantity < 5 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>1–4</div><div>R$ 35</div></div><div className={quantity >= 5 && quantity < 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>5–9</div><div>R$ 34</div></div><div className={quantity >= 10 ? 'font-bold text-primary' : 'text-muted-foreground'}><div>10+</div><div>R$ 33</div></div></div>
+            <div className="mt-2 rounded-lg border bg-secondary/40 p-2 text-center text-xs font-semibold">Preço fixo: R$ 38,00 por tela, em qualquer quantidade</div>
             <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2"><span className="text-xs text-muted-foreground">{quantity} tela{quantity === 1 ? '' : 's'} × {formatBRL(unitPriceCents)}</span><span className="text-lg font-bold">{formatBRL(totalCents)}</span></div>
+            <div className="mt-2 flex items-center justify-between rounded-lg border px-3 py-2 text-xs"><span className="text-muted-foreground">Estoque disponível</span><strong>{availableStock === null ? 'Consultando...' : availableStock + (availableStock === 1 ? ' tela' : ' telas')}</strong></div>
             <div className="mt-2 grid grid-cols-4 gap-1 border-t pt-2"><div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground"><Check className="size-3 shrink-0 text-primary" /><span>Acesso imediato</span></div><div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground"><Check className="size-3 shrink-0 text-primary" /><span>Vários dispositivos</span></div><div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground"><Check className="size-3 shrink-0 text-primary" /><span>Ativação por código</span></div><div className="flex flex-col items-center justify-center gap-0.5 text-center text-[9px] text-muted-foreground"><Check className="size-3 shrink-0 text-primary" /><span>Pagamento seguro (PIX)</span></div></div>
             <Button className="mt-2 h-9 w-full text-sm" onClick={handleBuy} disabled={pending || !product || !inputIsValid}>{pending ? <><Loader2 className="size-4 animate-spin" />Processando...</> : <>Comprar {inputIsValid ? quantity : '—'} {inputIsValid && quantity === 1 ? 'tela' : 'telas'}</>}</Button>
             {pendingPaymentMessage && <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center"><p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Pagamento pendente</p><p className="mt-1 text-[10px] text-muted-foreground">{pendingPaymentMessage}</p><Button type="button" variant="outline" className="mt-2 h-9 w-full text-xs" onClick={() => router.push('/minha-conta')}>Ver pagamento pendente</Button></div>}
