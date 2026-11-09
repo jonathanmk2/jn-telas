@@ -18,23 +18,9 @@ type BuyResult =
       needsAuth?: boolean
     }
 
-/*
- * REGRA DE PREÇO
- *
- * 1 a 4 telas  = R$ 35,00 cada
- * 5 a 9 telas  = R$ 34,00 cada
- * 10+ telas    = R$ 33,00 cada
- */
-function getUnitPriceCents(quantity: number): number {
-  if (quantity >= 10) {
-    return 3300
-  }
-
-  if (quantity >= 5) {
-    return 3400
-  }
-
-  return 3500
+/* Preço fixo: R$ 38,00 por tela, independentemente da quantidade. */
+function getUnitPriceCents(_quantity: number): number {
+  return 3800
 }
 
 /*
