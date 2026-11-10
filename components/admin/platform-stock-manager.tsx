@@ -32,7 +32,7 @@ export function PlatformStockManager({ ldAvailable, vsAvailable }: { ldAvailable
         <button type="button" onClick={() => setPlatform('ldcloud')} className={`rounded-lg border p-3 text-sm font-bold ${platform === 'ldcloud' ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'}`}>LD CLOUD</button>
         <button type="button" onClick={() => setPlatform('vsphone')} className={`rounded-lg border p-3 text-sm font-bold ${platform === 'vsphone' ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'}`}>VSPHONE</button>
       </div>
-      <div className="rounded-lg border bg-secondary/30 px-3 py-2 text-xs">Destino selecionado: <b>{platform === 'vsphone' ? 'VSPHONE VIP • 30 DIAS' : 'LD CLOUD VIP • 30 DIAS'}</b></div>
+      <div className="rounded-lg border bg-secondary/30 px-3 py-2 text-xs">Destino selecionado: <b>{platform === 'vsphone' ? 'VSPHONE KVIP • 30 DIAS' : 'LD CLOUD VIP • 30 DIAS'}</b></div>
       <textarea required value={codes} onChange={(e) => setCodes(e.target.value)} disabled={pending} className="min-h-36 w-full rounded-md border bg-background p-3 font-mono text-sm" placeholder={'Cole um código por linha\nCODIGO-001\nCODIGO-002'} />
       <div className="flex justify-end"><Button type="submit" disabled={pending}>{pending ? 'Adicionando...' : `Adicionar ao ${platform === 'vsphone' ? 'VSPHONE' : 'LD CLOUD'}`}</Button></div>
     </form>
