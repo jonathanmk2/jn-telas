@@ -199,6 +199,28 @@ export default async function MinhaContaPage() {
                           })}
                         </div>
                       )}
+                      {order.status === 'delivered' && orderCodes.length > 0 && (
+                        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                              <span className="text-xl">💬</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold">Grupo oficial de clientes JN Telas</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Entre no grupo para receber avisos, atualizações e suporte.</p>
+                              <a
+                                href="https://chat.whatsapp.com/JWtw40RKrTG5cqwR0U2TQe?s=cl&p=a&iam=2"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16a34a] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#15803d] sm:w-auto"
+                              >
+                                <span aria-hidden="true">☘</span>
+                                Entrar no grupo do WhatsApp
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </details>
                 )
