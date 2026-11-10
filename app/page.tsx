@@ -38,7 +38,7 @@ export default async function HomePage() {
   if (!hasSupabase) {
     products = [
       { id: 'ld-1', name: '1 Tela LD CLOUD VIP', screens: 1, price_cents: 3500, description: 'VIP • 30 dias', platform: 'ldcloud' },
-      { id: 'vs-1', name: '1 Tela VSPHONE VIP 30 DIAS', screens: 1, price_cents: 2400, description: 'VIP • 30 dias', platform: 'vsphone' },
+      { id: 'vs-1', name: '1 Tela VSPHONE KVIP 30 DIAS', screens: 1, price_cents: 3200, description: 'KVIP • 30 dias', platform: 'vsphone' },
     ]
   }
 
