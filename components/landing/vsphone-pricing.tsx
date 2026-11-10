@@ -19,11 +19,29 @@ export function VsPhonePricing({ products, isLoggedIn }: { products: Product[]; 
   const [pending, startTransition] = useTransition()
   const [quantity, setQuantity] = useState(1)
   const [stockMessage, setStockMessage] = useState<string | null>(null)
+  const [availableStock, setAvailableStock] = useState<number | null>(null)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [copied, setCopied] = useState(false)
   const [status, setStatus] = useState('pending')
   const keyRef = useRef<string | null>(null)
   const product = products.find((p) => p.screens === 1) ?? products[0] ?? null
+
+  useEffect(() => {
+    let active = true
+    async function loadStock() {
+      try {
+        const response = await fetch('/api/stock?platform=vsphone', { cache: 'no-store' })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active && Number.isInteger(data.available)) setAvailableStock(data.available)
+      } catch (error) {
+        console.error('Não foi possível consultar o estoque VSPhone:', error)
+      }
+    }
+    loadStock()
+    const interval = window.setInterval(loadStock, 15000)
+    return () => { active = false; window.clearInterval(interval) }
+  }, [])
   const price = unitPrice(quantity)
   const total = quantity * price
 
@@ -63,6 +81,7 @@ export function VsPhonePricing({ products, isLoggedIn }: { products: Product[]; 
       <div className="pt-3 text-center"><div className="relative mx-auto mb-3 flex h-[112px] w-full max-w-sm items-center justify-center overflow-hidden rounded-[24px] border-2 border-amber-300 bg-zinc-950 px-5 shadow-[0_0_34px_rgba(245,158,11,0.38),inset_0_0_24px_rgba(245,158,11,0.10)]"><div className="absolute -left-10 top-1/2 h-[72px] w-[440px] -translate-y-1/2 rounded-[50%] border border-amber-400/90 shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-[vsOrbit_4s_ease-in-out_infinite]" /><div className="absolute -left-10 top-0 h-full w-10 -skew-x-12 bg-amber-100/40 blur-md animate-[vsphoneShine_2.8s_ease-in-out_infinite]" /><div className="relative z-10 flex items-center gap-3 animate-[vsphoneFloat_3s_ease-in-out_infinite]"><img src="/vsphone-symbol.svg" alt="VSPhone" className="h-[78px] w-[112px] scale-[1.12] object-contain brightness-125 contrast-125 mix-blend-lighten drop-shadow-[0_0_16px_rgba(245,158,11,0.95)]" /><div className="text-[30px] font-black italic tracking-[-0.05em]"><span className="bg-gradient-to-b from-yellow-200 via-amber-400 to-orange-500 bg-clip-text text-transparent">VS</span><span className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.25)]">PHONE</span></div></div><div className="absolute bottom-3 left-1/2 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-amber-300 to-transparent shadow-[0_0_10px_rgba(245,158,11,1)]" /></div><style jsx>{`@keyframes vsphoneFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.02)}}@keyframes vsphoneShine{0%,30%{transform:translateX(-50px) skewX(-12deg);opacity:0}48%{opacity:1}72%,100%{transform:translateX(440px) skewX(-12deg);opacity:0}}@keyframes vsOrbit{0%,100%{transform:translateY(-50%) rotate(-4deg) scaleX(1)}50%{transform:translateY(-50%) rotate(4deg) scaleX(.94)}}`}</style><h3 className="text-xl font-bold">VSPHONE KVIP</h3><p className="mt-0.5 text-xs font-semibold text-primary">30 DIAS</p><p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">Código de ativação • Entrega automática após o PIX</p><div className="mt-2 flex items-baseline justify-center gap-1"><span className="text-3xl font-bold sm:text-4xl">{formatBRL(price)}</span><span className="text-xs text-muted-foreground">/ tela</span></div></div>
       <div className="mt-3 flex items-center gap-2"><Button type="button" variant="outline" size="icon" className="size-9 shrink-0" onClick={() => change(quantity - 1)} disabled={pending || quantity <= 1}><Minus className="size-4" /></Button><div className="flex h-9 flex-1 items-center justify-center rounded-lg border bg-background text-base font-bold">{quantity}</div><Button type="button" variant="outline" size="icon" className="size-9 shrink-0" onClick={() => change(quantity + 1)} disabled={pending || quantity >= 500}><Plus className="size-4" /></Button></div>
       <div className="mt-2 flex items-center justify-between rounded-lg border bg-background px-3 py-2"><span className="text-xs text-muted-foreground">{quantity} tela{quantity === 1 ? '' : 's'} × {formatBRL(price)}</span><span className="text-lg font-bold">{formatBRL(total)}</span></div>
+      <div className="mt-2 flex items-center justify-between rounded-lg border px-3 py-2 text-xs"><span className="text-muted-foreground">Estoque disponível</span><strong>{availableStock === null ? "Consultando..." : availableStock + (availableStock === 1 ? " tela" : " telas")}</strong></div>
       <div className="mt-2 grid grid-cols-3 gap-1 border-t pt-2">{['30 dias de acesso', 'Ativação por código', 'Pagamento seguro (PIX)'].map((text) => <div key={text} className="flex flex-col items-center gap-0.5 text-center text-[9px] text-muted-foreground"><Check className="size-3 text-primary" /><span>{text}</span></div>)}</div>
       <Button className="mt-2 h-9 w-full text-sm" onClick={buy} disabled={pending || !product}>{pending ? <><Loader2 className="size-4 animate-spin" />Processando...</> : <>Comprar {quantity} {quantity === 1 ? 'tela' : 'telas'}</>}</Button>{stockMessage && <div role="alert" className="mt-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-center text-xs text-yellow-700 dark:text-yellow-300">{stockMessage}</div>}
     </div></div></section>
