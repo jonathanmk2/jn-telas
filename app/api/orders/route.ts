@@ -8,7 +8,7 @@ const ORDER_EXPIRATION_MINUTES = 30
 
 type Platform = 'ldcloud' | 'vsphone'
 function unitPrice(platform: Platform, quantity: number) {
-  if (platform === 'vsphone') return quantity >= 10 ? 2200 : quantity >= 5 ? 2300 : 2400
+  if (platform === 'vsphone') return 3200
   return 3800
 }
 
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Pagamento indisponível no momento.' }, { status: 500 })
   }
 
-  const label = platform === 'vsphone' ? 'VSPHONE VIP 30 DIAS' : 'LD CLOUD VIP 30 DIAS'
+  const label = platform === 'vsphone' ? 'VSPHONE KVIP 30 DIAS' : 'LD CLOUD VIP 30 DIAS'
   const mercadoPagoBody = { type: 'online', total_amount: (totalCents / 100).toFixed(2), external_reference: order.id, processing_mode: 'automatic', description: `${quantity} ${quantity === 1 ? 'Tela' : 'Telas'} ${label}`, transactions: { payments: [{ amount: (totalCents / 100).toFixed(2), payment_method: { id: 'pix', type: 'bank_transfer' }, expiration_time: 'PT30M' }] }, payer: { email: user.email } }
   const mpResponse = await fetch('https://api.mercadopago.com/v1/orders', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': randomUUID() }, body: JSON.stringify(mercadoPagoBody) })
   if (!mpResponse.ok) {
